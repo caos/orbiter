@@ -77,7 +77,7 @@ func main() {
 	hashed := sha256.Sum256([]byte(pruned))
 	conv := conv.New(monitor, os, fmt.Sprintf("%x", hashed[:]))
 
-	gitClient := git.New(context.Background(), monitor, fmt.Sprintf("Node Agent %s", *nodeAgentID), "node-agent@caos.ch")
+	gitClient := git.New(context.Background(), monitor, fmt.Sprintf("Node Agent %s", *nodeAgentID))
 
 	var portsSlice []string
 	if len(*ignorePorts) > 0 {

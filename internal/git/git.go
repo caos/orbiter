@@ -44,11 +44,11 @@ type Client struct {
 	cloned    bool
 }
 
-func New(ctx context.Context, monitor mntr.Monitor, committer, email string) *Client {
+func New(ctx context.Context, monitor mntr.Monitor, committer string) *Client {
 	newClient := &Client{
 		ctx:       ctx,
 		committer: committer,
-		email:     email,
+		email:     "orbos@caos.ch",
 		monitor:   monitor,
 	}
 

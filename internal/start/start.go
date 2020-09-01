@@ -3,10 +3,11 @@ package start
 import (
 	"context"
 	"errors"
-	"github.com/caos/orbos/internal/operator/orbiter/kinds/clusters/kubernetes"
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"github.com/caos/orbos/internal/operator/orbiter/kinds/clusters/kubernetes"
 
 	"github.com/caos/orbos/internal/operator/zitadel"
 
@@ -272,7 +273,7 @@ func Boom(monitor mntr.Monitor, orbConfigPath string, localmode bool, version st
 }
 
 func gitClient(monitor mntr.Monitor, task string) *git.Client {
-	return git.New(context.Background(), monitor.WithField("task", task), "Boom", "boom@caos.ch")
+	return git.New(context.Background(), monitor.WithField("task", task), "Boom")
 }
 
 func checks(monitor mntr.Monitor, client *git.Client) {
@@ -296,7 +297,7 @@ func Zitadel(monitor mntr.Monitor, orbConfigPath string, k8sClient *kubernetes.C
 			return err
 		}
 
-		gitClient := git.New(context.Background(), monitor, "orbos", "orbos@caos.ch")
+		gitClient := git.New(context.Background(), monitor, "orbos")
 		if err := gitClient.Configure(orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
 			monitor.Error(err)
 			return err
@@ -327,7 +328,7 @@ func ZitadelBackup(monitor mntr.Monitor, orbConfigPath string, k8sClient *kubern
 		return err
 	}
 
-	gitClient := git.New(context.Background(), monitor, "orbos", "orbos@caos.ch")
+	gitClient := git.New(context.Background(), monitor, "orbos")
 	if err := gitClient.Configure(orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
 		monitor.Error(err)
 		return err
@@ -346,7 +347,7 @@ func ZitadelRestore(monitor mntr.Monitor, orbConfigPath string, k8sClient *kuber
 		return err
 	}
 
-	gitClient := git.New(context.Background(), monitor, "orbos", "orbos@caos.ch")
+	gitClient := git.New(context.Background(), monitor, "orbos")
 	if err := gitClient.Configure(orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
 		monitor.Error(err)
 		return err

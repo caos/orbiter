@@ -74,6 +74,6 @@ $ orbctl -f ~/.orb/myorb [command]
 
 		ctx := context.Background()
 
-		return ctx, monitor, orbConfig, git.New(ctx, monitor, "orbos", "orbos@caos.ch"), nil
+		return ctx, monitor, orbConfig, git.New(ctx, monitor, "orbos"), nil
 	}
 }

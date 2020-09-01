@@ -29,8 +29,8 @@ func main() {
 		monitor = monitor.Verbose()
 	}
 
-	ensure := git.New(context.Background(), monitor.WithField("task", "ensure"), "Boom", "boom@caos.ch")
-	query := git.New(context.Background(), monitor.WithField("task", "query"), "Boom", "boom@caos.ch")
+	ensure := git.New(context.Background(), monitor.WithField("task", "ensure"), "Boom")
+	query := git.New(context.Background(), monitor.WithField("task", "query"), "Boom")
 
 	ensure.Clone()
 	query.Clone()
