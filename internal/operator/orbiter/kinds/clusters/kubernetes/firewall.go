@@ -42,6 +42,19 @@ func firewallFunc(monitor mntr.Monitor, desired DesiredV0) (desire func(machine 
 			}
 		}
 
+		if desired.Spec.Networking.Network == "flannel" {
+			fw["flannel-net"] = &common.Allowed{
+				Port:     fmt.Sprintf("%d", 8285),
+				Protocol: "udp",
+			}
+			fw["flannel-net2"] = &common.Allowed{
+				Port:     fmt.Sprintf("%d", 8472),
+				Protocol: "udp",
+			}
+		}
+		for idx, value := range desired.Spec.Networking.OpenFirewallPorts {
+			fw[fmt.Sprintf("custom-%d", idx)] = value
+		}
 		firewall := common.ToFirewall(fw)
 		if firewall.IsContainedIn(machine.currentNodeagent.Open) && machine.desiredNodeagent.Firewall.Contains(firewall) {
 			machine.currentMachine.FirewallIsReady = true

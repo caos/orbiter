@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	core "k8s.io/api/core/v1"
 
+	"github.com/caos/orbos/internal/operator/common"
 	"github.com/caos/orbos/internal/operator/orbiter"
 )
 
@@ -26,10 +27,11 @@ type Spec struct {
 	ControlPlane Pool
 	Kubeconfig   *secret.Secret `yaml:",omitempty"`
 	Networking   struct {
-		DNSDomain   string
-		Network     string
-		ServiceCidr orbiter.CIDR
-		PodCidr     orbiter.CIDR
+		DNSDomain         string
+		Network           string
+		ServiceCidr       orbiter.CIDR
+		PodCidr           orbiter.CIDR
+		OpenFirewallPorts []*common.Allowed
 	}
 	Verbose  bool
 	Versions struct {
@@ -61,8 +63,8 @@ func (d *DesiredV0) validate() error {
 		return errors.Errorf("Unknown kubernetes version %s", d.Spec.Versions.Kubernetes)
 	}
 
-	if d.Spec.Networking.Network != "cilium" && d.Spec.Networking.Network != "calico" {
-		return errors.Errorf("Network must eighter be calico or cilium, but got %s", d.Spec.Networking.Network)
+	if d.Spec.Networking.Network != "cilium" && d.Spec.Networking.Network != "calico" && d.Spec.Networking.Network != "flannel" {
+		return errors.Errorf("Network must eighter be calico, flannel or cilium, but got %s", d.Spec.Networking.Network)
 	}
 
 	if err := d.Spec.Networking.ServiceCidr.Validate(); err != nil {
@@ -71,6 +73,12 @@ func (d *DesiredV0) validate() error {
 
 	if err := d.Spec.Networking.PodCidr.Validate(); err != nil {
 		return err
+	}
+
+	for _, port := range d.Spec.Networking.OpenFirewallPorts {
+		if err := port.Validate(); err != nil {
+			return err
+		}
 	}
 
 	seenPools := map[string][]string{

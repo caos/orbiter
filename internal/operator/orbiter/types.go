@@ -39,3 +39,12 @@ func (i IPAddress) Validate() error {
 	}
 	return nil
 }
+
+type Port uint16
+
+func (p Port) validate() error {
+	if p == 0 {
+		return errors.Errorf("port %d is not allowed", p)
+	}
+	return nil
+}

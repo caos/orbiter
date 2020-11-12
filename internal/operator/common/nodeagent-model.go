@@ -5,6 +5,7 @@ package common
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -171,6 +172,17 @@ func (p Ports) String() string {
 type Allowed struct {
 	Port     string
 	Protocol string
+}
+
+func (a Allowed) Validate() error {
+	_, err := strconv.ParseInt(a.Port, 10, 16)
+	if err != nil {
+		return err
+	}
+	if a.Protocol != "udp" && a.Protocol != "tcp" {
+		return fmt.Errorf("supported protocols are udp/tcp, got: %s", a.Protocol)
+	}
+	return nil
 }
 
 func (f Firewall) Contains(other Firewall) bool {
