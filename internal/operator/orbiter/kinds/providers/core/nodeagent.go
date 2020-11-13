@@ -168,7 +168,7 @@ MemoryAccounting=yes
 
 [Install]
 WantedBy=multi-user.target
-`, binary, machine.ID())), 600), "creating remote file %s failed", systemdPath)
+`, binary, machine.ID())), 644), "creating remote file %s failed", systemdPath)
 							}); err != nil {
 								return errors.Wrap(err, "remotely configuring Node Agent systemd unit failed")
 							}
