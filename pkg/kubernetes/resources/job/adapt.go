@@ -1,12 +1,14 @@
 package job
 
 import (
+	"reflect"
+	"time"
+
 	"github.com/caos/orbos/pkg/kubernetes"
 	"github.com/caos/orbos/pkg/kubernetes/resources"
 	batch "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
 	macherrs "k8s.io/apimachinery/pkg/api/errors"
-	"reflect"
-	"time"
 )
 
 func AdaptFuncToEnsure(job *batch.Job) (resources.QueryFunc, error) {
@@ -24,6 +26,10 @@ func AdaptFuncToEnsure(job *batch.Job) (resources.QueryFunc, error) {
 		changedImmutable := false
 		if !reflect.DeepEqual(job.GetAnnotations(), jobDef.GetAnnotations()) {
 			changedImmutable = true
+		}
+
+		if job.Spec.Template.Spec.SecurityContext == nil {
+			job.Spec.Template.Spec.SecurityContext = &v1.PodSecurityContext{}
 		}
 
 		if !reflect.DeepEqual(job.Spec.Template.Spec, jobDef.Spec.Template.Spec) &&

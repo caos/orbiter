@@ -77,7 +77,7 @@ func RestoreCommand(rv RootValues) *cobra.Command {
 			for _, kubeconfig := range kubeconfigs {
 				k8sClient := kubernetes2.NewK8sClient(monitor, &kubeconfig)
 				if k8sClient.Available() {
-					if err := start.DatabaseRestore(monitor, orbConfig.Path, k8sClient, backup, &version); err != nil {
+					if err := start.DatabaseRestore(monitor, k8sClient, gitClient, backup); err != nil {
 						return err
 					}
 				}
