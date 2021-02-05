@@ -23,7 +23,7 @@ jobs:
           CR_PAT: ${{ secrets.CR_PAT }}
           REGISTRY: ghcr.io
         run: |
-          npm install semantic-release@v16.0.2
+          npm install semantic-release@v17.0.4
           export BRANCH=${GITHUB_REF##*/}
           export VERSION=$BRANCH
           VERSION="v$(npx semantic-release --dry-run --plugins=@semantic-release/commit-analyzer --analize-commits | grep "The next release version is" | sed -ne 's/.*The\ next\ release\ version\ is\ \([0-9]\+\.[0-9]\+\.[0-9]\+\)$/\1/p')"
