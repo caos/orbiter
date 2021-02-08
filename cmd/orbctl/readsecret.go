@@ -20,7 +20,7 @@ func ReadSecretCommand(rv RootValues) *cobra.Command {
 		Example: `orbctl readsecret orbiter.k8s.kubeconfig > ~/.kube/config`,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-			_, monitor, orbConfig, gitClient, errFunc, err := rv()
+			ctx, monitor, orbConfig, gitClient, errFunc, err := rv()
 			if err != nil {
 				return err
 			}
@@ -32,7 +32,7 @@ func ReadSecretCommand(rv RootValues) *cobra.Command {
 				return err
 			}
 
-			if err := gitClient.Configure(orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
+			if err := gitClient.Configure(ctx, orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
 				return err
 			}
 

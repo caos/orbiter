@@ -1,6 +1,8 @@
 package cmds
 
 import (
+	"context"
+
 	"github.com/caos/orbos/internal/api"
 	boomapi "github.com/caos/orbos/internal/operator/boom/api"
 	cmdboom "github.com/caos/orbos/internal/operator/boom/cmd"
@@ -11,7 +13,7 @@ import (
 	"github.com/caos/orbos/pkg/labels"
 )
 
-func deployBoom(monitor mntr.Monitor, gitClient *git.Client, kubeconfig *string, binaryVersion string) error {
+func deployBoom(ctx context.Context, monitor mntr.Monitor, gitClient *git.Client, kubeconfig *string, binaryVersion string) error {
 	foundBoom, err := api.ExistsBoomYml(gitClient)
 	if err != nil {
 		return err
@@ -31,7 +33,7 @@ func deployBoom(monitor mntr.Monitor, gitClient *git.Client, kubeconfig *string,
 		return err
 	}
 
-	k8sClient := kubernetes.NewK8sClient(monitor, kubeconfig)
+	k8sClient := kubernetes.NewK8sClient(ctx, monitor, kubeconfig)
 
 	if desiredKind != nil &&
 		desiredKind.Spec != nil &&
@@ -51,13 +53,13 @@ func deployBoom(monitor mntr.Monitor, gitClient *git.Client, kubeconfig *string,
 	}
 	return nil
 }
-func deployNetworking(monitor mntr.Monitor, gitClient *git.Client, kubeconfig *string) error {
+func deployNetworking(ctx context.Context, monitor mntr.Monitor, gitClient *git.Client, kubeconfig *string) error {
 	found, err := api.ExistsNetworkingYml(gitClient)
 	if err != nil {
 		return err
 	}
 	if found {
-		k8sClient := kubernetes.NewK8sClient(monitor, kubeconfig)
+		k8sClient := kubernetes.NewK8sClient(ctx, monitor, kubeconfig)
 
 		if k8sClient.Available() {
 			tree, err := api.ReadNetworkinglYml(gitClient)

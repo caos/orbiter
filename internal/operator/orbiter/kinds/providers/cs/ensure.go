@@ -17,7 +17,7 @@ func query(
 	desired *Spec,
 	current *Current,
 	lb interface{},
-	context *context,
+	svc *machinesService,
 	nodeAgentsCurrent *common.CurrentNodeAgents,
 	nodeAgentsDesired *common.DesiredNodeAgents,
 	naFuncs core.IterateNodeAgentFuncs,
@@ -29,12 +29,12 @@ func query(
 		panic(errors.Errorf("Unknown or unsupported load balancing of type %T", lb))
 	}
 
-	hostPools, authChecks, err := lbCurrent.Current.Spec(context.machinesService)
+	hostPools, authChecks, err := lbCurrent.Current.Spec(svc)
 	if err != nil {
 		return nil, err
 	}
 
-	ensureFIPs, removeFIPs, poolsWithUnassignedVIPs, err := queryFloatingIPs(context, hostPools, current)
+	ensureFIPs, removeFIPs, poolsWithUnassignedVIPs, err := queryFloatingIPs(svc.cfg, hostPools, current)
 	if err != nil {
 		return nil, err
 	}
@@ -51,26 +51,26 @@ func query(
 		return nil
 	}
 
-	ensureServers, err := queryServers(context, current, hostPools, ensureNodeAgent)
+	ensureServers, err := queryServers(svc, current, hostPools, ensureNodeAgent)
 	if err != nil {
 		return nil, err
 	}
 
-	context.machinesService.onCreate = func(pool string, m infra.Machine) error {
-		_, err := core.DesireInternalOSFirewall(context.monitor, nodeAgentsDesired, nodeAgentsCurrent, context.machinesService, true, []string{"eth0"})
+	svc.onCreate = func(pool string, m infra.Machine) error {
+		_, err := core.DesireInternalOSFirewall(svc.cfg.monitor, nodeAgentsDesired, nodeAgentsCurrent, svc, true, []string{"eth0"})
 		if err != nil {
 			return err
 		}
 
 		vips := hostedVIPs(hostPools, m, current)
-		_, err = core.DesireOSNetworkingForMachine(context.monitor, nodeAgentsDesired, nodeAgentsCurrent, m, "dummy", vips)
+		_, err = core.DesireOSNetworkingForMachine(svc.cfg.monitor, nodeAgentsDesired, nodeAgentsCurrent, m, "dummy", vips)
 		if err != nil {
 			return err
 		}
 
-		return ensureServer(context, current, hostPools, pool, m.(*machine), ensureNodeAgent)
+		return ensureServer(svc, current, hostPools, pool, m.(*machine), ensureNodeAgent)
 	}
-	wrappedMachines := wrap.MachinesService(context.machinesService, *lbCurrent, &dynamiclbmodel.VRRP{
+	wrappedMachines := wrap.MachinesService(svc, *lbCurrent, &dynamiclbmodel.VRRP{
 		VRRPInterface: "eth1",
 		NotifyMaster:  notifyMaster(hostPools, current, poolsWithUnassignedVIPs),
 		AuthCheck:     checkAuth,
@@ -79,7 +79,7 @@ func query(
 		var done bool
 		return orbiter.ToEnsureResult(done, helpers.Fanout([]func() error{
 			func() error {
-				return helpers.Fanout(ensureTokens(context.monitor, []byte(desired.APIToken.Value), authChecks))()
+				return helpers.Fanout(ensureTokens(svc.cfg.monitor, []byte(desired.APIToken.Value), authChecks))()
 			},
 			func() error { return helpers.Fanout(ensureFIPs)() },
 			func() error { return helpers.Fanout(removeFIPs)() },
@@ -90,16 +90,16 @@ func query(
 					return err
 				}
 
-				fwDone, err := core.DesireInternalOSFirewall(context.monitor, nodeAgentsDesired, nodeAgentsCurrent, context.machinesService, true, []string{"eth0"})
+				fwDone, err := core.DesireInternalOSFirewall(svc.cfg.monitor, nodeAgentsDesired, nodeAgentsCurrent, svc, true, []string{"eth0"})
 				if err != nil {
 					return err
 				}
 
-				vips, err := allHostedVIPs(hostPools, context.machinesService, current)
+				vips, err := allHostedVIPs(hostPools, svc, current)
 				if err != nil {
 					return err
 				}
-				nwDone, err := core.DesireOSNetworking(context.monitor, nodeAgentsDesired, nodeAgentsCurrent, context.machinesService, "dummy", vips)
+				nwDone, err := core.DesireOSNetworking(svc.cfg.monitor, nodeAgentsDesired, nodeAgentsCurrent, svc, "dummy", vips)
 				if err != nil {
 					return err
 				}

@@ -2,6 +2,7 @@ package dynamic
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sort"
 	"strconv"
@@ -111,7 +112,7 @@ func AdaptFunc(whitelist WhiteListFunc) orbiter.AdaptFunc {
 		}
 		currentTree.Parsed = current
 
-		return func(nodeAgentsCurrent *common.CurrentNodeAgents, nodeagents *common.DesiredNodeAgents, queried map[string]interface{}) (orbiter.EnsureFunc, error) {
+		return func(_ context.Context, nodeAgentsCurrent *common.CurrentNodeAgents, nodeagents *common.DesiredNodeAgents, queried map[string]interface{}) (orbiter.EnsureFunc, error) {
 
 			wl := whitelist()
 

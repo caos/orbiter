@@ -94,7 +94,7 @@ func (n sortableDestinations) Less(i, j int) bool {
 
 // normalize returns a normalizedLoadBalancing for each unique destination backendPort and ip combination
 // whereas only one random configured healthcheck is relevant
-func normalize(ctx *context, spec map[string][]*dynamic.VIP) ([]*normalizedLoadbalancer, []*firewall) {
+func normalize(ctx *svcConfig, spec map[string][]*dynamic.VIP) ([]*normalizedLoadbalancer, []*firewall) {
 	var normalized []*normalizedLoadbalancer
 	var firewalls []*firewall
 
@@ -333,7 +333,7 @@ func removeResourceFunc(monitor mntr.Monitor, resource, id string, call func(...
 	}
 }
 
-func queryLB(context *context, normalized []*normalizedLoadbalancer) (func() error, error) {
+func queryLB(context *svcConfig, normalized []*normalizedLoadbalancer) (func() error, error) {
 	lb, err := chainInEnsureOrder(
 		context, normalized,
 		queryHealthchecks,
@@ -356,11 +356,11 @@ func queryLB(context *context, normalized []*normalizedLoadbalancer) (func() err
 	}, nil
 }
 
-type ensureLBFunc func(*context, []*normalizedLoadbalancer) ([]func() error, []func() error, error)
+type ensureLBFunc func(*svcConfig, []*normalizedLoadbalancer) ([]func() error, []func() error, error)
 
-type ensureFWFunc func(*context, []*firewall) ([]func() error, []func() error, error)
+type ensureFWFunc func(*svcConfig, []*firewall) ([]func() error, []func() error, error)
 
-func chainInEnsureOrder(ctx *context, lb []*normalizedLoadbalancer, query ...ensureLBFunc) ([]func() error, error) {
+func chainInEnsureOrder(ctx *svcConfig, lb []*normalizedLoadbalancer, query ...ensureLBFunc) ([]func() error, error) {
 	var ensureOperations []func() error
 	var removeOperations []func() error
 

@@ -6,9 +6,9 @@ import (
 	"github.com/cloudscale-ch/cloudscale-go-sdk"
 )
 
-func queryServers(context *context, current *Current, loadbalancing map[string][]*dynamic.VIP, ensureNodeAgent func(m infra.Machine) error) ([]func() error, error) {
+func queryServers(svc *machinesService, current *Current, loadbalancing map[string][]*dynamic.VIP, ensureNodeAgent func(m infra.Machine) error) ([]func() error, error) {
 
-	pools, err := context.machinesService.machines()
+	pools, err := svc.machines()
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +19,7 @@ func queryServers(context *context, current *Current, loadbalancing map[string][
 			mach := machines[idx]
 			ensureServers = append(ensureServers, func(poolName string, m *machine) func() error {
 				return func() error {
-					return ensureServer(context, current, loadbalancing, poolName, m, ensureNodeAgent)
+					return ensureServer(svc, current, loadbalancing, poolName, m, ensureNodeAgent)
 				}
 			}(poolName, mach))
 		}
@@ -27,15 +27,15 @@ func queryServers(context *context, current *Current, loadbalancing map[string][
 	return ensureServers, nil
 }
 
-func ensureServer(context *context, current *Current, loadbalancing map[string][]*dynamic.VIP, poolName string, machine *machine, ensureNodeAgent func(m infra.Machine) error) (err error) {
+func ensureServer(svc *machinesService, current *Current, loadbalancing map[string][]*dynamic.VIP, poolName string, machine *machine, ensureNodeAgent func(m infra.Machine) error) (err error) {
 	defer func() {
 		if err == nil {
-			err = ensureOS(ensureNodeAgent, machine, loadbalancing, current, context)
+			err = ensureOS(ensureNodeAgent, machine, loadbalancing, current, svc.cfg)
 		}
 	}()
 
 	_, isExternal := loadbalancing[poolName]
-	if context.machinesService.oneoff {
+	if svc.oneoff {
 		isExternal = true
 	}
 	// Always use external ips
@@ -63,11 +63,10 @@ func ensureServer(context *context, current *Current, loadbalancing map[string][
 	if updateInterfaces == nil {
 		return nil
 	}
-	return updateServer(context, machine.server, &updateInterfaces)
-
+	return updateServer(svc.cfg, machine.server, &updateInterfaces)
 }
 
-func ensureOS(ensureNodeAgent func(m infra.Machine) error, machine *machine, loadbalancing map[string][]*dynamic.VIP, current *Current, context *context) error {
+func ensureOS(ensureNodeAgent func(m infra.Machine) error, machine *machine, loadbalancing map[string][]*dynamic.VIP, current *Current, context *svcConfig) error {
 	if err := ensureNodeAgent(machine); err != nil {
 		return err
 	}
@@ -75,8 +74,8 @@ func ensureOS(ensureNodeAgent func(m infra.Machine) error, machine *machine, loa
 	return nil
 }
 
-func updateServer(context *context, server *cloudscale.Server, interfaces *[]cloudscale.InterfaceRequest) error {
-	return context.client.Servers.Update(context.ctx, server.UUID, &cloudscale.ServerUpdateRequest{
+func updateServer(cfg *svcConfig, server *cloudscale.Server, interfaces *[]cloudscale.InterfaceRequest) error {
+	return cfg.client.Servers.Update(cfg.ctx, server.UUID, &cloudscale.ServerUpdateRequest{
 		TaggedResourceRequest: cloudscale.TaggedResourceRequest{Tags: server.Tags},
 		Name:                  server.Name,
 		Status:                server.Status,

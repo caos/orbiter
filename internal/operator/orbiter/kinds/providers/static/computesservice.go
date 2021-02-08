@@ -2,11 +2,13 @@ package static
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
-	secret2 "github.com/caos/orbos/pkg/secret"
 	"path/filepath"
 	"strings"
+
+	secret2 "github.com/caos/orbos/pkg/secret"
 
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/clusters/core/infra"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers/core"
@@ -16,6 +18,7 @@ import (
 var _ core.MachinesService = (*machinesService)(nil)
 
 type machinesService struct {
+	ctx        context.Context
 	monitor    mntr.Monitor
 	desired    *DesiredV0
 	statusFile string
@@ -23,11 +26,13 @@ type machinesService struct {
 	cache      map[string]cachedMachines
 }
 
-func NewMachinesService(
+func newMachinesService(
+	ctx context.Context,
 	monitor mntr.Monitor,
 	desired *DesiredV0,
 	id string) *machinesService {
 	return &machinesService{
+		ctx,
 		monitor,
 		desired,
 		filepath.Join("/var/orbiter", id),
@@ -126,7 +131,7 @@ func (c *machinesService) cachedPool(poolName string) (cachedMachines, error) {
 	newCache := make([]*machine, 0)
 
 	initializeMachine := func(rebootRequired bool, replacementRequired bool, spec *Machine) *machine {
-		return newMachine(c.monitor, c.statusFile, "orbiter", &spec.ID, string(spec.IP),
+		return newMachine(c.ctx, c.monitor, c.statusFile, "orbiter", &spec.ID, string(spec.IP),
 			rebootRequired,
 			func() {
 				spec.RebootRequired = true

@@ -10,10 +10,11 @@ import (
 
 var _ ensureLBFunc = queryTargetPools
 
-func queryTargetPools(context *context, loadbalancing []*normalizedLoadbalancer) ([]func() error, []func() error, error) {
-	gcePools, err := context.client.TargetPools.
-		List(context.projectID, context.desired.Region).
-		Filter(fmt.Sprintf(`description : "orb=%s;provider=%s*"`, context.orbID, context.providerID)).
+func queryTargetPools(cfg *svcConfig, loadbalancing []*normalizedLoadbalancer) ([]func() error, []func() error, error) {
+	gcePools, err := cfg.computeClient.TargetPools.
+		List(cfg.projectID, cfg.desired.Region).
+		Context(cfg.ctx).
+		Filter(fmt.Sprintf(`description : "orb=%s;provider=%s*"`, cfg.orbID, cfg.providerID)).
 		Fields("items(description,name,instances,selfLink,name)").
 		Do()
 	if err != nil {
@@ -36,12 +37,13 @@ createLoop:
 				if len(gceTp.HealthChecks) > 0 && gceTp.HealthChecks[0] != lb.targetPool.gce.HealthChecks[0] {
 					ensure = append(ensure, operateFunc(
 						lb.targetPool.log("Removing healthcheck", true, nil),
-						computeOpCall(context.client.TargetPools.RemoveHealthCheck(
-							context.projectID,
-							context.desired.Region,
+						computeOpCall(cfg.computeClient.TargetPools.RemoveHealthCheck(
+							cfg.projectID,
+							cfg.desired.Region,
 							gceTp.Name,
 							&compute.TargetPoolsRemoveHealthCheckRequest{HealthChecks: []*compute.HealthCheckReference{{HealthCheck: gceTp.HealthChecks[0]}}},
 						).
+							Context(cfg.ctx).
 							RequestId(uuid.NewV1().String()).
 							Do),
 						toErrFunc(lb.targetPool.log("Healthcheck removed", false, nil)),
@@ -49,12 +51,13 @@ createLoop:
 
 					ensure = append(ensure, operateFunc(
 						lb.targetPool.log("Adding healthcheck", true, nil),
-						computeOpCall(context.client.TargetPools.AddHealthCheck(
-							context.projectID,
-							context.desired.Region,
+						computeOpCall(cfg.computeClient.TargetPools.AddHealthCheck(
+							cfg.projectID,
+							cfg.desired.Region,
 							gceTp.Name,
 							&compute.TargetPoolsAddHealthCheckRequest{HealthChecks: []*compute.HealthCheckReference{{HealthCheck: lb.healthcheck.gce.SelfLink}}},
 						).
+							Context(cfg.ctx).
 							RequestId(uuid.NewV1().String()).
 							Do),
 						toErrFunc(lb.targetPool.log("Healthcheck added", false, nil)),
@@ -73,13 +76,15 @@ createLoop:
 					lb.targetPool.log("Creating target pool", true, nil)()
 				}
 			}(lb),
-			computeOpCall(context.client.TargetPools.
-				Insert(context.projectID, context.desired.Region, lb.targetPool.gce).
+			computeOpCall(cfg.computeClient.TargetPools.
+				Insert(cfg.projectID, cfg.desired.Region, lb.targetPool.gce).
+				Context(cfg.ctx).
 				RequestId(uuid.NewV1().String()).
 				Do),
 			func(pool *targetPool) func() error {
 				return func() error {
-					newTP, err := context.client.TargetPools.Get(context.projectID, context.desired.Region, pool.gce.Name).
+					newTP, err := cfg.computeClient.TargetPools.Get(cfg.projectID, cfg.desired.Region, pool.gce.Name).
+						Context(cfg.ctx).
 						Fields("selfLink").
 						Do()
 					if err != nil {
@@ -102,8 +107,9 @@ removeLoop:
 				continue removeLoop
 			}
 		}
-		remove = append(remove, removeResourceFunc(context.monitor, "target pool", gceTp.Name, context.client.TargetPools.
-			Delete(context.projectID, context.desired.Region, gceTp.Name).
+		remove = append(remove, removeResourceFunc(cfg.monitor, "target pool", gceTp.Name, cfg.computeClient.TargetPools.
+			Delete(cfg.projectID, cfg.desired.Region, gceTp.Name).
+			Context(cfg.ctx).
 			RequestId(uuid.NewV1().String()).
 			Do))
 	}

@@ -44,9 +44,8 @@ type Client struct {
 	cloned    bool
 }
 
-func New(ctx context.Context, monitor mntr.Monitor, committer, email string) *Client {
+func New(monitor mntr.Monitor, committer, email string) *Client {
 	newClient := &Client{
-		ctx:       ctx,
 		committer: committer,
 		email:     email,
 		monitor:   monitor,
@@ -62,7 +61,8 @@ func (g *Client) GetURL() string {
 	return g.repoURL
 }
 
-func (g *Client) Configure(repoURL string, deploykey []byte) error {
+func (g *Client) Configure(ctx context.Context, repoURL string, deploykey []byte) error {
+	g.ctx = ctx
 	signer, err := ssh.ParsePrivateKey(deploykey)
 	if err != nil {
 		return errors.Wrap(err, "parsing deployment key failed")

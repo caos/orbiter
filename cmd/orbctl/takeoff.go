@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
+
 	"github.com/caos/orbos/cmd/orbctl/cmds"
 	"github.com/caos/orbos/internal/start"
-	kubernetes2 "github.com/caos/orbos/pkg/kubernetes"
+	"github.com/caos/orbos/pkg/kubernetes"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -93,7 +95,7 @@ func StartOrbiter(rv RootValues) *cobra.Command {
 			err = errFunc(err)
 		}()
 
-		if err := gitClient.Configure(orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
+		if err := gitClient.Configure(ctx, orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
 			return err
 		}
 
@@ -162,7 +164,7 @@ func StartNetworking(rv RootValues) *cobra.Command {
 			err = errFunc(err)
 		}()
 
-		k8sClient, err := kubernetes2.NewK8sClientWithPath(monitor, kubeconfig)
+		k8sClient, err := kubernetes.NewK8sClientWithPath(context.Background(), monitor, kubeconfig)
 		if err != nil {
 			return err
 		}

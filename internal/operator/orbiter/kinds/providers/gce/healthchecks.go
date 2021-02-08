@@ -8,10 +8,11 @@ import (
 
 var _ ensureLBFunc = queryHealthchecks
 
-func queryHealthchecks(context *context, loadbalancing []*normalizedLoadbalancer) ([]func() error, []func() error, error) {
-	gceHealthchecks, err := context.client.HttpHealthChecks.
-		List(context.projectID).
-		Filter(fmt.Sprintf(`description : "orb=%s;provider=%s*"`, context.orbID, context.providerID)).
+func queryHealthchecks(cfg *svcConfig, loadbalancing []*normalizedLoadbalancer) ([]func() error, []func() error, error) {
+	gceHealthchecks, err := cfg.computeClient.HttpHealthChecks.
+		List(cfg.projectID).
+		Context(cfg.ctx).
+		Filter(fmt.Sprintf(`description : "orb=%s;provider=%s*"`, cfg.orbID, cfg.providerID)).
 		Fields("items(description,name,port,requestPath,selfLink)").
 		Do()
 	if err != nil {
@@ -30,7 +31,8 @@ createLoop:
 				if gceHC.Port != lb.healthcheck.gce.Port || gceHC.RequestPath != lb.healthcheck.gce.RequestPath {
 					ensure = append(ensure, operateFunc(
 						lb.healthcheck.log("Patching healthcheck", true),
-						computeOpCall(context.client.HttpHealthChecks.Patch(context.projectID, gceHC.Name, lb.healthcheck.gce).
+						computeOpCall(cfg.computeClient.HttpHealthChecks.Patch(cfg.projectID, gceHC.Name, lb.healthcheck.gce).
+							Context(cfg.ctx).
 							RequestId(uuid.NewV1().String()).
 							Do),
 						toErrFunc(lb.healthcheck.log("Healthcheck patched", false)),
@@ -43,13 +45,15 @@ createLoop:
 		lb.healthcheck.gce.Name = newName()
 		ensure = append(ensure, operateFunc(
 			lb.healthcheck.log("Creating healthcheck", true),
-			computeOpCall(context.client.HttpHealthChecks.
-				Insert(context.projectID, lb.healthcheck.gce).
+			computeOpCall(cfg.computeClient.HttpHealthChecks.
+				Insert(cfg.projectID, lb.healthcheck.gce).
+				Context(cfg.ctx).
 				RequestId(uuid.NewV1().String()).
 				Do),
 			func(hc *healthcheck) func() error {
 				return func() error {
-					newHC, newHCErr := context.client.HttpHealthChecks.Get(context.projectID, hc.gce.Name).
+					newHC, newHCErr := cfg.computeClient.HttpHealthChecks.Get(cfg.projectID, hc.gce.Name).
+						Context(cfg.ctx).
 						Fields("selfLink").
 						Do()
 					if newHCErr != nil {
@@ -72,8 +76,9 @@ removeLoop:
 				continue removeLoop
 			}
 		}
-		remove = append(remove, removeResourceFunc(context.monitor, "healthcheck", gceHC.Name, context.client.HttpHealthChecks.
-			Delete(context.projectID, gceHC.Name).
+		remove = append(remove, removeResourceFunc(cfg.monitor, "healthcheck", gceHC.Name, cfg.computeClient.HttpHealthChecks.
+			Delete(cfg.projectID, gceHC.Name).
+			Context(cfg.ctx).
 			RequestId(uuid.NewV1().String()).
 			Do))
 	}

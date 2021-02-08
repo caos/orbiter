@@ -31,7 +31,7 @@ func Takeoff(
 		return err
 	}
 
-	if err := gitClient.Configure(orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
+	if err := gitClient.Configure(ctx, orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
 		return err
 	}
 
@@ -78,7 +78,7 @@ func Takeoff(
 	}
 
 	for _, kubeconfig := range allKubeconfigs {
-		k8sClient := kubernetes.NewK8sClient(monitor, &kubeconfig)
+		k8sClient := kubernetes.NewK8sClient(ctx, monitor, &kubeconfig)
 		if k8sClient.Available() {
 			if err := kubernetes.EnsureCommonArtifacts(monitor, k8sClient); err != nil {
 				monitor.Info("failed to apply common resources into k8s-cluster")
@@ -95,11 +95,11 @@ func Takeoff(
 			monitor.Info("Failed to connect to k8s")
 		}
 
-		if err := deployBoom(monitor, gitClient, &kubeconfig, version); err != nil {
+		if err := deployBoom(ctx, monitor, gitClient, &kubeconfig, version); err != nil {
 			return err
 		}
 
-		if err := deployNetworking(monitor, gitClient, &kubeconfig); err != nil {
+		if err := deployNetworking(ctx, monitor, gitClient, &kubeconfig); err != nil {
 			return err
 		}
 	}

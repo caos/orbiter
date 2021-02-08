@@ -3,6 +3,7 @@
 package nodeagent
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"runtime/debug"
@@ -61,7 +62,7 @@ func Iterator(
 			return
 		}
 
-		if err := gitClient.Configure(string(repoURL), repoKey); err != nil {
+		if err := gitClient.Configure(context.TODO(), string(repoURL), repoKey); err != nil {
 			monitor.Error(err)
 			return
 		}

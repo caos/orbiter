@@ -10,7 +10,7 @@ import (
 func destroy(svc *machinesService, delegates map[string]interface{}) error {
 	return helpers.Fanout([]func() error{
 		func() error {
-			destroyLB, err := queryLB(svc.context, nil)
+			destroyLB, err := queryLB(svc.cfg, nil)
 			if err != nil {
 				return err
 			}
@@ -39,36 +39,39 @@ func destroy(svc *machinesService, delegates map[string]interface{}) error {
 				func() error {
 					var deleteDisks []func() error
 
-					deleteMonitor := svc.context.monitor.WithField("type", "persistent disk")
+					deleteMonitor := svc.cfg.monitor.WithField("type", "persistent disk")
 
 					for kind, delegate := range delegates {
 						volumes, ok := delegate.([]infra.Volume)
 						if ok {
 							for idx := range volumes {
 								diskName := volumes[idx].Name
-								deleteDisks = append(deleteDisks, deleteDiskFunc(svc.context, deleteMonitor.WithField("id", diskName), kind, diskName))
+								deleteDisks = append(deleteDisks, deleteDiskFunc(svc.cfg, deleteMonitor.WithField("id", diskName), kind, diskName))
 							}
 						}
 					}
 					return helpers.Fanout(deleteDisks)()
 				},
 				func() error {
-					_, deleteFirewalls, err := queryFirewall(svc.context, nil)
+					_, deleteFirewalls, err := queryFirewall(svc.cfg, nil)
 					if err != nil {
 						return err
 					}
-					return destroyNetwork(svc.context, deleteFirewalls)
+					return destroyNetwork(svc.cfg, deleteFirewalls)
 				},
 			})()
 		},
 	})()
 }
 
-func deleteDiskFunc(context *context, monitor mntr.Monitor, kind, id string) func() error {
+func deleteDiskFunc(cfg *svcConfig, monitor mntr.Monitor, kind, id string) func() error {
 	return func() error {
 		return operateFunc(
 			func() { monitor.Debug("Removing resource") },
-			computeOpCall(context.client.Disks.Delete(context.projectID, context.desired.Zone, id).RequestId(uuid.NewV1().String()).Do),
+			computeOpCall(cfg.computeClient.Disks.Delete(cfg.projectID, cfg.desired.Zone, id).
+				Context(cfg.ctx).
+				RequestId(uuid.NewV1().String()).
+				Do),
 			func() error { monitor.Info("Resource removed"); return nil },
 		)()
 	}

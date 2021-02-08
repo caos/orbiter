@@ -2,17 +2,17 @@ package cs
 
 import "github.com/caos/orbos/internal/helpers"
 
-func destroy(context *context, current *Current) error {
+func destroy(svc *machinesService, current *Current) error {
 
-	_, delFuncs, _, err := queryFloatingIPs(context, nil, current)
+	_, delFuncs, _, err := queryFloatingIPs(svc.cfg, nil, current)
 
-	pools, err := context.machinesService.ListPools()
+	pools, err := svc.ListPools()
 	if err != nil {
 		return err
 	}
 	for idx := range pools {
 		pool := pools[idx]
-		machines, err := context.machinesService.List(pool)
+		machines, err := svc.List(pool)
 		if err != nil {
 			return err
 		}

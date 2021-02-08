@@ -1,6 +1,8 @@
 package gce
 
 import (
+	ctxpkg "context"
+
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/loadbalancers"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/loadbalancers/dynamic"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers/core"
@@ -60,8 +62,8 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 		}
 		secret.AppendSecrets("", secrets, lbSecrets)
 
-		svcFunc := func() (*machinesService, error) {
-			return service(monitor, &desiredKind.Spec, orbID, providerID, oneoff)
+		svcFunc := func(ctx ctxpkg.Context) (*machinesService, error) {
+			return service(ctx, monitor, &desiredKind.Spec, orbID, providerID, oneoff)
 		}
 
 		current := &Current{
@@ -72,7 +74,7 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 		}
 		currentTree.Parsed = current
 
-		return func(nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, _ map[string]interface{}) (ensureFunc orbiter.EnsureFunc, err error) {
+		return func(ctx ctxpkg.Context, nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, _ map[string]interface{}) (ensureFunc orbiter.EnsureFunc, err error) {
 				defer func() {
 					err = errors.Wrapf(err, "querying %s failed", desiredKind.Common.Kind)
 				}()
@@ -81,7 +83,7 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 					return nil, err
 				}
 
-				svc, err := svcFunc()
+				svc, err := svcFunc(ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -90,7 +92,7 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 					return nil, err
 				}
 
-				if _, err := lbQuery(nodeAgentsCurrent, nodeAgentsDesired, nil); err != nil {
+				if _, err := lbQuery(ctx, nodeAgentsCurrent, nodeAgentsDesired, nil); err != nil {
 					return nil, err
 				}
 
@@ -102,10 +104,11 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 					return err
 				}
 
-				ctx, err := svcFunc()
+				ctx, err := svcFunc(ctxpkg.Background())
 				if err != nil {
 					return err
 				}
+
 				return destroy(ctx, delegates)
 			}, func(orb orb.Orb) error {
 
@@ -131,7 +134,7 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 					}
 				}
 
-				svc, err := svcFunc()
+				svc, err := svcFunc(ctxpkg.Background())
 				if err != nil {
 					return err
 				}
@@ -140,7 +143,7 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 					panic(err)
 				}
 
-				return core.ConfigureNodeAgents(svc, svc.context.monitor, orb)
+				return core.ConfigureNodeAgents(svc, svc.cfg.monitor, orb)
 			},
 			migrate,
 			secrets,

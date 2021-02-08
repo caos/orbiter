@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 
 	"github.com/caos/orbos/pkg/git"
@@ -29,8 +28,8 @@ func main() {
 		monitor = monitor.Verbose()
 	}
 
-	ensure := git.New(context.Background(), monitor.WithField("task", "ensure"), "Boom", "boom@caos.ch")
-	query := git.New(context.Background(), monitor.WithField("task", "query"), "Boom", "boom@caos.ch")
+	ensure := git.New(monitor.WithField("task", "ensure"), "Boom", "boom@caos.ch")
+	query := git.New(monitor.WithField("task", "query"), "Boom", "boom@caos.ch")
 
 	ensure.Clone()
 	query.Clone()

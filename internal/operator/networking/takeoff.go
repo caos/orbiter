@@ -2,14 +2,16 @@ package networking
 
 import (
 	"errors"
+
 	"github.com/caos/orbos/internal/operator/core"
 	"github.com/caos/orbos/mntr"
 	"github.com/caos/orbos/pkg/git"
-	kubernetes2 "github.com/caos/orbos/pkg/kubernetes"
+	"github.com/caos/orbos/pkg/kubernetes"
 	"github.com/caos/orbos/pkg/tree"
 )
 
-func Takeoff(monitor mntr.Monitor, gitClient *git.Client, adapt core.AdaptFunc, k8sClient *kubernetes2.Client) func() {
+// TODO: Shouldn't gitClient be reconfigured in each iteration?
+func Takeoff(monitor mntr.Monitor, gitClient *git.Client, adapt core.AdaptFunc, k8sClient *kubernetes.Client) func() {
 	return func() {
 		internalMonitor := monitor.WithField("operator", "networking")
 		internalMonitor.Info("Takeoff")

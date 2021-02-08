@@ -1,14 +1,14 @@
 package start
 
 import (
-	"context"
+	"time"
+
 	"github.com/caos/orbos/mntr"
 	"github.com/caos/orbos/pkg/git"
-	"time"
 )
 
 func gitClient(monitor mntr.Monitor, task string) *git.Client {
-	return git.New(context.Background(), monitor.WithField("task", task), "Boom", "boom@caos.ch")
+	return git.New(monitor.WithField("task", task), "Boom", "boom@caos.ch")
 }
 
 func checks(monitor mntr.Monitor, client *git.Client) {

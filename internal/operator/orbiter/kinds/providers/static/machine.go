@@ -1,6 +1,7 @@
 package static
 
 import (
+	"context"
 	"strings"
 
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers/core"
@@ -30,6 +31,7 @@ type machine struct {
 }
 
 func newMachine(
+	ctx context.Context,
 	monitor mntr.Monitor,
 	poolFile string,
 	remoteUser string,
@@ -47,7 +49,7 @@ func newMachine(
 		poolFile:             poolFile,
 		X_ID:                 id,
 		X_IP:                 ip,
-		Machine:              ssh.NewMachine(monitor, remoteUser, ip),
+		Machine:              ssh.NewMachine(ctx, monitor, remoteUser, ip),
 		rebootRequired:       rebootRequired,
 		requireReboot:        requireReboot,
 		unrequireReboot:      unrequireReboot,
@@ -85,16 +87,19 @@ func (c *machine) ReplacementRequired() (bool, func(), func()) {
 	return c.replacementRequired, c.requireReplacement, c.unrequireReplacement
 }
 
-func ListMachines(monitor mntr.Monitor, desiredTree *tree.Tree, providerID string) (map[string]infra.Machine, error) {
+func ListMachines(ctx context.Context, monitor mntr.Monitor, desiredTree *tree.Tree, providerID string) (map[string]infra.Machine, error) {
 	desired, err := parseDesiredV0(desiredTree)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing desired state failed")
 	}
 	desiredTree.Parsed = desired
 
-	machinesSvc := NewMachinesService(monitor,
+	machinesSvc := newMachinesService(
+		ctx,
+		monitor,
 		desired,
-		providerID)
+		providerID,
+	)
 
 	if err := machinesSvc.updateKeys(); err != nil {
 		return nil, err

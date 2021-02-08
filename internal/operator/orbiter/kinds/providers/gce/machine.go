@@ -1,6 +1,7 @@
 package gce
 
 import (
+	"context"
 	"io"
 	"sort"
 
@@ -31,7 +32,7 @@ type instance struct {
 	url     string
 	pool    string
 	remove  func() error
-	context *context
+	context *svcConfig
 	start   bool
 	machine
 	rebootRequired       bool
@@ -47,7 +48,7 @@ type instance struct {
 }
 
 func newMachine(
-	context *context,
+	context *svcConfig,
 	monitor mntr.Monitor,
 	id,
 	ip,
@@ -127,7 +128,7 @@ func (i instances) refs() []*compute.InstanceReference {
 	return ret
 }
 
-func ListMachines(monitor mntr.Monitor, desiredTree *tree.Tree, orbID, providerID string) (map[string]infra.Machine, error) {
+func ListMachines(ctx context.Context, monitor mntr.Monitor, desiredTree *tree.Tree, orbID, providerID string) (map[string]infra.Machine, error) {
 	desired, err := parseDesiredV0(desiredTree)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing desired state failed")
@@ -139,7 +140,7 @@ func ListMachines(monitor mntr.Monitor, desiredTree *tree.Tree, orbID, providerI
 		return nil, err
 	}
 
-	svc, err := service(monitor, &desired.Spec, orbID, providerID, true)
+	svc, err := service(ctx, monitor, &desired.Spec, orbID, providerID, true)
 	if err != nil {
 		return nil, err
 	}

@@ -9,10 +9,11 @@ import (
 
 var _ ensureFWFunc = queryFirewall
 
-func queryFirewall(context *context, firewalls []*firewall) ([]func() error, []func() error, error) {
-	gceFirewalls, err := context.client.Firewalls.
-		List(context.projectID).
-		Filter(fmt.Sprintf(`network = "https://www.googleapis.com/compute/v1/%s"`, context.networkURL)).
+func queryFirewall(cfg *svcConfig, firewalls []*firewall) ([]func() error, []func() error, error) {
+	gceFirewalls, err := cfg.computeClient.Firewalls.
+		List(cfg.projectID).
+		Context(cfg.ctx).
+		Filter(fmt.Sprintf(`network = "https://www.googleapis.com/compute/v1/%s"`, cfg.networkURL)).
 		Fields("items(network,name,description,allowed,targetTags,sourceRanges)").
 		Do()
 	if err != nil {
@@ -29,7 +30,10 @@ createLoop:
 					!stringsEqual(gceFW.SourceRanges, fw.gce.SourceRanges) {
 					ensure = append(ensure, operateFunc(
 						fw.log("Patching firewall", true),
-						computeOpCall(context.client.Firewalls.Patch(context.projectID, gceFW.Name, fw.gce).RequestId(uuid.NewV1().String()).Do),
+						computeOpCall(cfg.computeClient.Firewalls.Patch(cfg.projectID, gceFW.Name, fw.gce).
+							Context(cfg.ctx).
+							RequestId(uuid.NewV1().String()).
+							Do),
 						toErrFunc(fw.log("Firewall patched", false)),
 					))
 				}
@@ -39,8 +43,9 @@ createLoop:
 		fw.gce.Name = newName()
 		ensure = append(ensure, operateFunc(
 			fw.log("Creating firewall", true),
-			computeOpCall(context.client.Firewalls.
-				Insert(context.projectID, fw.gce).
+			computeOpCall(cfg.computeClient.Firewalls.
+				Insert(cfg.projectID, fw.gce).
+				Context(cfg.ctx).
 				RequestId(uuid.NewV1().String()).
 				Do),
 			toErrFunc(fw.log("Firewall created", false)),
@@ -55,8 +60,9 @@ removeLoop:
 				continue removeLoop
 			}
 		}
-		remove = append(remove, removeResourceFunc(context.monitor, "firewall", gceTp.Name, context.client.Firewalls.
-			Delete(context.projectID, gceTp.Name).
+		remove = append(remove, removeResourceFunc(cfg.monitor, "firewall", gceTp.Name, cfg.computeClient.Firewalls.
+			Delete(cfg.projectID, gceTp.Name).
+			Context(cfg.ctx).
 			RequestId(uuid.NewV1().String()).
 			Do))
 	}

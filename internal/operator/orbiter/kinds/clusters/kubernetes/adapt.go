@@ -1,6 +1,8 @@
 package kubernetes
 
 import (
+	"context"
+
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/clusters/core/infra"
 	"github.com/caos/orbos/pkg/labels"
 	core "k8s.io/api/core/v1"
@@ -86,7 +88,9 @@ func AdaptFunc(
 		if desiredKind.Spec.Kubeconfig != nil && desiredKind.Spec.Kubeconfig.Value != "" {
 			kc = &desiredKind.Spec.Kubeconfig.Value
 		}
-		k8sClient := kubernetes.NewK8sClient(monitor, kc)
+		dContext, dCancel := context.WithCancel(context.Background())
+		defer dCancel()
+		k8sClient := kubernetes.NewK8sClient(dContext, monitor, kc)
 
 		if k8sClient.Available() && deployOrbiter {
 			if err := kubernetes.EnsureCommonArtifacts(monitor, k8sClient); err != nil {
@@ -128,6 +132,7 @@ func AdaptFunc(
 				panic(err)
 			}
 		}
+		dCancel()
 
 		currentKind := "orbiter.caos.ch/KubernetesCluster"
 		current := &CurrentCluster{}
@@ -139,7 +144,7 @@ func AdaptFunc(
 			Current: current,
 		}
 
-		return func(nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, providers map[string]interface{}) (orbiter.EnsureFunc, error) {
+		return func(ctx context.Context, nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, providers map[string]interface{}) (orbiter.EnsureFunc, error) {
 				ensureFunc, err := query(
 					monitor,
 					clusterID,
@@ -148,7 +153,7 @@ func AdaptFunc(
 					providers,
 					nodeAgentsCurrent,
 					nodeAgentsDesired,
-					k8sClient,
+					kubernetes.NewK8sClient(ctx, monitor, kc),
 					oneoff,
 					gitClient,
 				)

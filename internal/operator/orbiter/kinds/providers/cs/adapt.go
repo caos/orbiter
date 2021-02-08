@@ -1,6 +1,8 @@
 package cs
 
 import (
+	"context"
+
 	"github.com/caos/orbos/internal/operator/common"
 	"github.com/caos/orbos/internal/operator/orbiter"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/loadbalancers"
@@ -53,9 +55,8 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 		}
 		secret.AppendSecrets("", secrets, lbSecrets)
 
-		ctx, err := buildContext(monitor, &desiredKind.Spec, orbID, providerID, oneoff)
-		if err != nil {
-			return nil, nil, nil, migrate, nil, err
+		svcFunc := func(ctx context.Context) *machinesService {
+			return service(ctx, monitor, &desiredKind.Spec, orbID, providerID, oneoff)
 		}
 
 		current := &Current{
@@ -66,7 +67,7 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 		}
 		currentTree.Parsed = current
 
-		return func(nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, _ map[string]interface{}) (ensureFunc orbiter.EnsureFunc, err error) {
+		return func(ctx context.Context, nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, _ map[string]interface{}) (ensureFunc orbiter.EnsureFunc, err error) {
 				defer func() {
 					err = errors.Wrapf(err, "querying %s failed", desiredKind.Common.Kind)
 				}()
@@ -75,27 +76,29 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 					return nil, err
 				}
 
-				if err := ctx.machinesService.use(desiredKind.Spec.SSHKey); err != nil {
+				svc := svcFunc(ctx)
+				if err := svc.use(desiredKind.Spec.SSHKey); err != nil {
 					return nil, err
 				}
 
-				if _, err := lbQuery(nodeAgentsCurrent, nodeAgentsDesired, nil); err != nil {
+				if _, err := lbQuery(ctx, nodeAgentsCurrent, nodeAgentsDesired, nil); err != nil {
 					return nil, err
 				}
 
 				_, naFuncs := core.NodeAgentFuncs(monitor, repoURL, repoKey)
 
-				return query(&desiredKind.Spec, current, lbCurrent.Parsed, ctx, nodeAgentsCurrent, nodeAgentsDesired, naFuncs, orbiterCommit)
+				return query(&desiredKind.Spec, current, lbCurrent.Parsed, svc, nodeAgentsCurrent, nodeAgentsDesired, naFuncs, orbiterCommit)
 			}, func(delegates map[string]interface{}) error {
 				if err := lbDestroy(delegates); err != nil {
 					return err
 				}
 
-				if err := ctx.machinesService.use(desiredKind.Spec.SSHKey); err != nil {
+				svc := svcFunc(context.Background())
+				if err := svc.use(desiredKind.Spec.SSHKey); err != nil {
 					return err
 				}
 
-				return destroy(ctx, current)
+				return destroy(svc, current)
 			}, func(orb orb.Orb) error {
 
 				if err := desiredKind.validateAPIToken(); err != nil {
@@ -119,11 +122,12 @@ func AdaptFunc(providerID, orbID string, whitelist dynamic.WhiteListFunc, orbite
 					}
 				}
 
-				if err := ctx.machinesService.use(desiredKind.Spec.SSHKey); err != nil {
+				svc := svcFunc(context.Background())
+				if err := svc.use(desiredKind.Spec.SSHKey); err != nil {
 					panic(err)
 				}
 
-				return core.ConfigureNodeAgents(ctx.machinesService, ctx.monitor, orb)
+				return core.ConfigureNodeAgents(svc, svc.cfg.monitor, orb)
 			}, migrate, secrets, nil
 	}
 }

@@ -1,6 +1,7 @@
 package cs
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -22,21 +23,18 @@ import (
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/clusters/core/infra"
 )
 
-func ListMachines(monitor mntr.Monitor, desiredTree *tree.Tree, orbID, providerID string) (map[string]infra.Machine, error) {
+func ListMachines(ctx context.Context, monitor mntr.Monitor, desiredTree *tree.Tree, orbID, providerID string) (map[string]infra.Machine, error) {
 	desired, err := parseDesired(desiredTree)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing desired state failed")
 	}
 	desiredTree.Parsed = desired
 
-	ctx, err := buildContext(monitor, &desired.Spec, orbID, providerID, true)
-	if err != nil {
-		return nil, err
-	}
+	svc := service(ctx, monitor, &desired.Spec, orbID, providerID, true)
 
-	if err := ctx.machinesService.use(desired.Spec.SSHKey); err != nil {
+	if err := svc.use(desired.Spec.SSHKey); err != nil {
 		invalidKey := &secret.Secret{Value: "invalid"}
-		if err := ctx.machinesService.use(&SSHKey{
+		if err := svc.use(&SSHKey{
 			Private: invalidKey,
 			Public:  invalidKey,
 		}); err != nil {
@@ -44,26 +42,26 @@ func ListMachines(monitor mntr.Monitor, desiredTree *tree.Tree, orbID, providerI
 		}
 	}
 
-	return core.ListMachines(ctx.machinesService)
+	return core.ListMachines(svc)
 }
 
 var _ core.MachinesService = (*machinesService)(nil)
 
 type machinesService struct {
-	context *context
-	oneoff  bool
-	key     *SSHKey
-	cache   struct {
+	cfg    *svcConfig
+	oneoff bool
+	key    *SSHKey
+	cache  struct {
 		instances map[string][]*machine
 		sync.Mutex
 	}
 	onCreate func(pool string, machine infra.Machine) error
 }
 
-func newMachinesService(context *context, oneoff bool) *machinesService {
+func newMachinesService(cfg *svcConfig, oneoff bool) *machinesService {
 	return &machinesService{
-		context: context,
-		oneoff:  oneoff,
+		cfg:    cfg,
+		oneoff: oneoff,
 	}
 }
 
@@ -77,13 +75,13 @@ func (m *machinesService) use(key *SSHKey) error {
 
 func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 
-	desired, ok := m.context.desired.Pools[poolName]
+	desired, ok := m.cfg.desired.Pools[poolName]
 	if !ok {
 		return nil, fmt.Errorf("Pool %s is not configured", poolName)
 	}
 
 	name := newName()
-	monitor := machineMonitor(m.context.monitor, name, poolName)
+	monitor := machineMonitor(m.cfg.monitor, name, poolName)
 
 	monitor.Debug("Creating instance")
 
@@ -95,7 +93,7 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 		"",
 		[]string{"orbiter", "wheel"},
 		"orbiter",
-		[]string{m.context.desired.SSHKey.Public.Value},
+		[]string{m.cfg.desired.SSHKey.Public.Value},
 		"ALL=(ALL) NOPASSWD:ALL",
 	).AddCmd(
 		"sudo echo \"\n\nPermitRootLogin no\n\" >> /etc/ssh/sshd_config",
@@ -111,12 +109,12 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 		return nil, err
 	}
 
-	newServer, err := m.context.client.Servers.Create(m.context.ctx, &cloudscale.ServerRequest{
+	newServer, err := m.cfg.client.Servers.Create(m.cfg.ctx, &cloudscale.ServerRequest{
 		ZonalResourceRequest: cloudscale.ZonalResourceRequest{},
 		TaggedResourceRequest: cloudscale.TaggedResourceRequest{
 			Tags: map[string]string{
-				"orb":      m.context.orbID,
-				"provider": m.context.providerID,
+				"orb":      m.cfg.orbID,
+				"provider": m.cfg.providerID,
 				"pool":     poolName,
 			},
 		},
@@ -166,7 +164,7 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 func (m *machinesService) toMachine(server *cloudscale.Server, monitor mntr.Monitor, pool *Pool, poolName string) (*machine, error) {
 	internalIP, sshIP := createdIPs(server.Interfaces, m.oneoff || true /* always use public ip */)
 
-	sshMachine := ssh.NewMachine(monitor, "orbiter", sshIP)
+	sshMachine := ssh.NewMachine(m.cfg.ctx, monitor, "orbiter", sshIP)
 	if err := sshMachine.UseKey([]byte(m.key.Private.Value)); err != nil {
 		return nil, err
 	}
@@ -177,7 +175,7 @@ func (m *machinesService) toMachine(server *cloudscale.Server, monitor mntr.Moni
 		sshIP,
 		sshMachine,
 		m.removeMachineFunc(server.Tags["pool"], server.UUID),
-		m.context,
+		m.cfg,
 		pool,
 		poolName,
 	)
@@ -245,10 +243,10 @@ func (m *machinesService) machines() (map[string][]*machine, error) {
 	}
 
 	// TODO: Doesn't work, all machines get destroyed that belong to the token
-	servers, err := m.context.client.Servers.List(m.context.ctx /**/, func(r *http.Request) {
+	servers, err := m.cfg.client.Servers.List(m.cfg.ctx /**/, func(r *http.Request) {
 		params := r.URL.Query()
-		params["tag:orb"] = []string{m.context.orbID}
-		params["tag:provider"] = []string{m.context.providerID}
+		params["tag:orb"] = []string{m.cfg.orbID}
+		params["tag:provider"] = []string{m.cfg.providerID}
 	})
 	if err != nil {
 		return nil, err
@@ -258,7 +256,7 @@ func (m *machinesService) machines() (map[string][]*machine, error) {
 	for idx := range servers {
 		server := servers[idx]
 		pool := server.Tags["pool"]
-		machine, err := m.toMachine(&server, machineMonitor(m.context.monitor, server.Name, pool), m.context.desired.Pools[pool], pool)
+		machine, err := m.toMachine(&server, machineMonitor(m.cfg.monitor, server.Name, pool), m.cfg.desired.Pools[pool], pool)
 		if err != nil {
 			return nil, err
 		}
@@ -282,7 +280,7 @@ func (m *machinesService) removeMachineFunc(pool, uuid string) func() error {
 		m.cache.instances[pool] = cleanMachines
 		m.cache.Unlock()
 
-		return m.context.client.Servers.Delete(m.context.ctx, uuid)
+		return m.cfg.client.Servers.Delete(m.cfg.ctx, uuid)
 	}
 }
 

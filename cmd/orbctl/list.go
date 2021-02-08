@@ -30,7 +30,7 @@ func ListCommand(rv RootValues) *cobra.Command {
 	flags.StringVar(&context, "context", "", "Print machines from this context only")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
-		_, monitor, orbConfig, gitClient, errFunc, err := rv()
+		ctx, monitor, orbConfig, gitClient, errFunc, err := rv()
 		if err != nil {
 			return err
 		}
@@ -38,7 +38,7 @@ func ListCommand(rv RootValues) *cobra.Command {
 			err = errFunc(err)
 		}()
 
-		return machines(monitor, gitClient, orbConfig, func(machineIDs []string, machines map[string]infra.Machine, _ *tree.Tree) error {
+		return machines(ctx, monitor, gitClient, orbConfig, func(machineIDs []string, machines map[string]infra.Machine, _ *tree.Tree) error {
 
 			printer := tableprinter.New(os.Stdout)
 			printer.BorderTop, printer.BorderBottom = true, true

@@ -6,19 +6,17 @@ import (
 	"google.golang.org/api/servicemanagement/v1"
 )
 
-func ensureIdentityAwareProxyAPIEnabled(c *context) error {
-	svc, err := servicemanagement.NewService(c.ctx, *c.auth)
-	if err != nil {
-		return err
-	}
+func ensureIdentityAwareProxyAPIEnabled(c *svcConfig) error {
 
 	return operateFunc(
 		func() {
 			c.monitor.Debug("Enabling Identity Aware Proxy API")
 		},
-		servicesOpCall(svc.Services.Enable("iap.googleapis.com", &servicemanagement.EnableServiceRequest{
+		servicesOpCall(c.apiClient.Services.Enable("iap.googleapis.com", &servicemanagement.EnableServiceRequest{
 			ConsumerId: fmt.Sprintf("project:%s", c.projectID),
-		}).Do),
+		}).
+			Context(c.ctx).
+			Do),
 		func() error {
 			c.monitor.Debug("Identity Aware Proxy API ensured")
 			return nil

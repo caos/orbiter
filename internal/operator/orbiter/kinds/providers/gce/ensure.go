@@ -42,7 +42,7 @@ func query(
 	if err != nil {
 		return nil, err
 	}
-	normalized, firewalls := normalize(svc.context, vips)
+	normalized, firewalls := normalize(svc.cfg, vips)
 
 	var (
 		ensureLB             func() error
@@ -51,12 +51,12 @@ func query(
 	if err := helpers.Fanout([]func() error{
 		func() error {
 			var err error
-			ensureLB, err = queryLB(svc.context, normalized)
+			ensureLB, err = queryLB(svc.cfg, normalized)
 			return err
 		},
 		func() error {
 			var err error
-			createFWs, deleteFWs, err = queryFirewall(svc.context, firewalls)
+			createFWs, deleteFWs, err = queryFirewall(svc.cfg, firewalls)
 			return err
 		},
 	})(); err != nil {
@@ -77,7 +77,7 @@ func query(
 	desireNodeAgent := func(pool string, machine infra.Machine) error {
 
 		machineID := machine.ID()
-		machineMonitor := svc.context.monitor.WithField("machine", machineID)
+		machineMonitor := svc.cfg.monitor.WithField("machine", machineID)
 		na, _ := nodeAgentsDesired.Get(machineID)
 		if na.Software.Health.Config == nil {
 			na.Software.Health.Config = make(map[string]string)
@@ -147,8 +147,8 @@ func query(
 
 		var done bool
 		return orbiter.ToEnsureResult(done, helpers.Fanout([]func() error{
-			func() error { return ensureIdentityAwareProxyAPIEnabled(svc.context) },
-			func() error { return ensureNetwork(svc.context, createFWs, deleteFWs) },
+			func() error { return ensureIdentityAwareProxyAPIEnabled(svc.cfg) },
+			func() error { return ensureNetwork(svc.cfg, createFWs, deleteFWs) },
 			svc.restartPreemptibleMachines,
 			ensureLB,
 			func() error {
@@ -180,7 +180,7 @@ func query(
 					return err
 				}
 
-				fwDone, err := core.DesireInternalOSFirewall(svc.context.monitor, nodeAgentsDesired, nodeAgentsCurrent, svc, false, []string{"eth0"})
+				fwDone, err := core.DesireInternalOSFirewall(svc.cfg.monitor, nodeAgentsDesired, nodeAgentsCurrent, svc, false, []string{"eth0"})
 				if err != nil {
 					return err
 				}

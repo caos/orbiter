@@ -1,9 +1,11 @@
 package providers
 
 import (
-	"github.com/caos/orbos/pkg/secret"
+	"context"
 	"regexp"
 	"strings"
+
+	"github.com/caos/orbos/pkg/secret"
 
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers/cs"
 
@@ -91,6 +93,7 @@ func GetQueryAndDestroyFuncs(
 }
 
 func ListMachines(
+	ctx context.Context,
 	monitor mntr.Monitor,
 	providerTree *tree.Tree,
 	provID string,
@@ -103,6 +106,7 @@ func ListMachines(
 	switch providerTree.Common.Kind {
 	case "orbiter.caos.ch/GCEProvider":
 		return gce.ListMachines(
+			ctx,
 			monitor,
 			providerTree,
 			orbID(repoURL),
@@ -110,6 +114,7 @@ func ListMachines(
 		)
 	case "orbiter.caos.ch/CloudScaleProvider":
 		return cs.ListMachines(
+			ctx,
 			monitor,
 			providerTree,
 			orbID(repoURL),
@@ -117,6 +122,7 @@ func ListMachines(
 		)
 	case "orbiter.caos.ch/StaticProvider":
 		return static.ListMachines(
+			ctx,
 			monitor,
 			providerTree,
 			provID,

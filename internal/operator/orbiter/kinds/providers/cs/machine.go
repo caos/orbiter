@@ -18,7 +18,7 @@ type machine struct {
 	server *cloudscale.Server
 	*ssh.Machine
 	remove       func() error
-	context      *context
+	context      *svcConfig
 	reboot       *action
 	replacement  *action
 	pool         *Pool
@@ -28,7 +28,7 @@ type machine struct {
 	X_externalIP string `header:"external ip"`
 }
 
-func newMachine(server *cloudscale.Server, internalIP, externalIP string, sshMachine *ssh.Machine, remove func() error, context *context, pool *Pool, poolName string) *machine {
+func newMachine(server *cloudscale.Server, internalIP, externalIP string, sshMachine *ssh.Machine, remove func() error, context *svcConfig, pool *Pool, poolName string) *machine {
 	return &machine{
 		server:       server,
 		X_ID:         server.Name,

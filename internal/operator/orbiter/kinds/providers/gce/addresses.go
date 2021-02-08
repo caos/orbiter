@@ -8,13 +8,14 @@ import (
 
 var _ ensureLBFunc = queryAddresses
 
-func queryAddresses(context *context, loadbalancing []*normalizedLoadbalancer) ([]func() error, []func() error, error) {
+func queryAddresses(cfg *svcConfig, loadbalancing []*normalizedLoadbalancer) ([]func() error, []func() error, error) {
 
 	addresses := normalizedLoadbalancing(loadbalancing).uniqueAddresses()
 
-	gceAddresses, err := context.client.Addresses.
-		List(context.projectID, context.desired.Region).
-		Filter(fmt.Sprintf(`description : "orb=%s;provider=%s*"`, context.orbID, context.providerID)).
+	gceAddresses, err := cfg.computeClient.Addresses.
+		List(cfg.projectID, cfg.desired.Region).
+		Context(cfg.ctx).
+		Filter(fmt.Sprintf(`description : "orb=%s;provider=%s*"`, cfg.orbID, cfg.providerID)).
 		Fields("items(address,name,description)").
 		Do()
 	if err != nil {
@@ -35,13 +36,16 @@ createLoop:
 		addr.gce.Name = newName()
 		ensure = append(ensure, operateFunc(
 			addr.log("Creating external address", true),
-			computeOpCall(context.client.Addresses.
-				Insert(context.projectID, context.desired.Region, addr.gce).
+			computeOpCall(cfg.computeClient.Addresses.
+				Insert(cfg.projectID, cfg.desired.Region, addr.gce).
+				Context(cfg.ctx).
 				RequestId(uuid.NewV1().String()).
 				Do),
 			func(a *address) func() error {
 				return func() error {
-					newAddr, newAddrErr := context.client.Addresses.Get(context.projectID, context.desired.Region, a.gce.Name).
+					newAddr, newAddrErr := cfg.computeClient.Addresses.
+						Get(cfg.projectID, cfg.desired.Region, a.gce.Name).
+						Context(cfg.ctx).
 						Fields("address").
 						Do()
 					if newAddrErr != nil {
@@ -62,8 +66,9 @@ removeLoop:
 				continue removeLoop
 			}
 		}
-		remove = append(remove, removeResourceFunc(context.monitor, "external address", gceAddress.Name, context.client.Addresses.
-			Delete(context.projectID, context.desired.Region, gceAddress.Name).
+		remove = append(remove, removeResourceFunc(cfg.monitor, "external address", gceAddress.Name, cfg.computeClient.Addresses.
+			Delete(cfg.projectID, cfg.desired.Region, gceAddress.Name).
+			Context(cfg.ctx).
 			RequestId(uuid.NewV1().String()).
 			Do))
 	}

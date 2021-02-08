@@ -27,7 +27,7 @@ func ExecCommand(rv RootValues) *cobra.Command {
 	flags.StringVar(&command, "command", "", "Command to be executed")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
-		_, monitor, orbConfig, gitClient, errFunc, err := rv()
+		ctx, monitor, orbConfig, gitClient, errFunc, err := rv()
 		if err != nil {
 			return err
 		}
@@ -35,7 +35,7 @@ func ExecCommand(rv RootValues) *cobra.Command {
 			err = errFunc(err)
 		}()
 
-		return machines(monitor, gitClient, orbConfig, func(machineIDs []string, machines map[string]infra.Machine, _ *tree.Tree) error {
+		return machines(ctx, monitor, gitClient, orbConfig, func(machineIDs []string, machines map[string]infra.Machine, _ *tree.Tree) error {
 
 			machineID := ""
 			if len(args) > 0 {

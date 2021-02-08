@@ -12,7 +12,7 @@ func ReplaceCommand(rv RootValues) *cobra.Command {
 		Short: "Replace a node with a new machine available in the same pool",
 		Long:  "Pass machine ids as arguments, omit arguments for selecting machines interactively",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			_, monitor, orbConfig, gitClient, errFunc, err := rv()
+			ctx, monitor, orbConfig, gitClient, errFunc, err := rv()
 			if err != nil {
 				return err
 			}
@@ -20,7 +20,7 @@ func ReplaceCommand(rv RootValues) *cobra.Command {
 				err = errFunc(err)
 			}()
 
-			return requireMachines(monitor, gitClient, orbConfig, args, func(machine infra.Machine) (required bool, require func(), unrequire func()) {
+			return requireMachines(ctx, monitor, gitClient, orbConfig, args, func(machine infra.Machine) (required bool, require func(), unrequire func()) {
 				return machine.ReplacementRequired()
 			})
 		},

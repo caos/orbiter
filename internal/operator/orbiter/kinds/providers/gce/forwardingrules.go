@@ -8,10 +8,11 @@ import (
 
 var _ ensureLBFunc = queryForwardingRules
 
-func queryForwardingRules(context *context, loadbalancing []*normalizedLoadbalancer) ([]func() error, []func() error, error) {
-	gceRules, err := context.client.ForwardingRules.
-		List(context.projectID, context.desired.Region).
-		Filter(fmt.Sprintf(`description : "orb=%s;provider=%s*"`, context.orbID, context.providerID)).
+func queryForwardingRules(cfg *svcConfig, loadbalancing []*normalizedLoadbalancer) ([]func() error, []func() error, error) {
+	gceRules, err := cfg.computeClient.ForwardingRules.
+		List(cfg.projectID, cfg.desired.Region).
+		Context(cfg.ctx).
+		Filter(fmt.Sprintf(`description : "orb=%s;provider=%s*"`, cfg.orbID, cfg.providerID)).
 		Fields("items(description,name,target,portRange,IPAddress)").
 		Do()
 	if err != nil {
@@ -42,8 +43,9 @@ createLoop:
 					l.forwardingRule.log("Creating forwarding rule", true)()
 				}
 			}(lb),
-			computeOpCall(context.client.ForwardingRules.
-				Insert(context.projectID, context.desired.Region, lb.forwardingRule.gce).
+			computeOpCall(cfg.computeClient.ForwardingRules.
+				Insert(cfg.projectID, cfg.desired.Region, lb.forwardingRule.gce).
+				Context(cfg.ctx).
 				RequestId(uuid.NewV1().String()).
 				Do),
 			toErrFunc(lb.forwardingRule.log("Forwarding rule created", false)),
@@ -60,8 +62,9 @@ removeLoop:
 			}
 		}
 		remove = append(remove, removeResourceFunc(
-			context.monitor, "forwarding rule", rule.Name, context.client.ForwardingRules.
-				Delete(context.projectID, context.desired.Region, rule.Name).
+			cfg.monitor, "forwarding rule", rule.Name, cfg.computeClient.ForwardingRules.
+				Delete(cfg.projectID, cfg.desired.Region, rule.Name).
+				Context(cfg.ctx).
 				RequestId(uuid.NewV1().String()).
 				Do,
 		))

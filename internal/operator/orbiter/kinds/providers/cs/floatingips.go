@@ -11,7 +11,7 @@ import (
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/loadbalancers/dynamic"
 )
 
-func queryFloatingIPs(context *context, loadbalancing map[string][]*dynamic.VIP, writeTo *Current) ([]func() error, []func() error, map[string]bool, error) {
+func queryFloatingIPs(context *svcConfig, loadbalancing map[string][]*dynamic.VIP, writeTo *Current) ([]func() error, []func() error, map[string]bool, error) {
 
 	haveUnassignedVIPs := make(map[string]bool)
 	floatingIPs, err := context.client.FloatingIPs.List(context.ctx, func(r *http.Request) {

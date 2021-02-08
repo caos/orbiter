@@ -1,6 +1,8 @@
 package orb
 
 import (
+	"context"
+
 	"github.com/caos/orbos/internal/api"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/clusters"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers"
@@ -164,13 +166,13 @@ func AdaptFunc(
 			Providers: providerCurrents,
 		}
 
-		return func(nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, _ map[string]interface{}) (ensureFunc orbiter.EnsureFunc, err error) {
+		return func(ctx context.Context, nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, _ map[string]interface{}) (ensureFunc orbiter.EnsureFunc, err error) {
 
 				providerEnsurers := make([]orbiter.EnsureFunc, 0)
 				queriedProviders := make(map[string]interface{})
 				for _, querier := range providerQueriers {
 					queryFunc := func() (orbiter.EnsureFunc, error) {
-						return querier(nodeAgentsCurrent, nodeAgentsDesired, nil)
+						return querier(ctx, nodeAgentsCurrent, nodeAgentsDesired, nil)
 					}
 					ensurer, err := orbiter.QueryFuncGoroutine(queryFunc)
 
@@ -187,7 +189,7 @@ func AdaptFunc(
 				clusterEnsurers := make([]orbiter.EnsureFunc, 0)
 				for _, querier := range clusterQueriers {
 					queryFunc := func() (orbiter.EnsureFunc, error) {
-						return querier(nodeAgentsCurrent, nodeAgentsDesired, queriedProviders)
+						return querier(ctx, nodeAgentsCurrent, nodeAgentsDesired, queriedProviders)
 					}
 					ensurer, err := orbiter.QueryFuncGoroutine(queryFunc)
 

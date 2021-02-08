@@ -1,6 +1,7 @@
 package orbiter
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -37,7 +38,7 @@ func NoopConfigure(orb orbconfig.Orb) error {
 	return nil
 }
 
-type QueryFunc func(nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, queried map[string]interface{}) (EnsureFunc, error)
+type QueryFunc func(ctx context.Context, nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, queried map[string]interface{}) (EnsureFunc, error)
 
 type EnsureFunc func(pdf api.PushDesiredFunc) *EnsureResult
 
@@ -132,9 +133,12 @@ func Adapt(gitClient *git.Client, monitor mntr.Monitor, finished chan struct{}, 
 	return query, destroy, configure, migrate, treeDesired, treeCurrent, secrets, err
 }
 
-func Takeoff(monitor mntr.Monitor, conf *Config, healthyChan chan bool) func() {
+func Takeoff(ctx context.Context, monitor mntr.Monitor, conf *Config, healthyChan chan bool) func() {
 
 	return func() {
+
+		itCtx, itCancel := context.WithCancel(ctx)
+		defer itCancel()
 
 		var err error
 		defer func() {
@@ -194,7 +198,7 @@ func Takeoff(monitor mntr.Monitor, conf *Config, healthyChan chan bool) func() {
 		}
 
 		queryFunc := func() (EnsureFunc, error) {
-			return query(&currentNodeAgents.Current, &desiredNodeAgents.Spec.NodeAgents, nil)
+			return query(itCtx, &currentNodeAgents.Current, &desiredNodeAgents.Spec.NodeAgents, nil)
 		}
 		ensure, err := QueryFuncGoroutine(queryFunc)
 		if err != nil {

@@ -2,28 +2,32 @@ package ssh
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 
 	"github.com/caos/orbos/internal/ssh"
 
 	"github.com/caos/orbos/mntr"
-	"github.com/pkg/errors"
 
 	sshlib "golang.org/x/crypto/ssh"
 )
 
 type Machine struct {
+	ctx        context.Context
 	monitor    mntr.Monitor
 	remoteUser string
 	ip         string
 	sshCfg     *sshlib.ClientConfig
 }
 
-func NewMachine(monitor mntr.Monitor, remoteUser, ip string) *Machine {
+func NewMachine(ctx context.Context, monitor mntr.Monitor, remoteUser, ip string) *Machine {
 	return &Machine{
+		ctx:        ctx,
 		remoteUser: remoteUser,
 		monitor: monitor.WithFields(map[string]interface{}{
 			"host": ip,
@@ -90,11 +94,11 @@ func (c *Machine) Shell() (err error) {
 	}
 
 	if err := sess.RequestPty("xterm", 40, 80, modes); err != nil {
-		return errors.Wrap(err, "request for pseudo terminal failed")
+		return fmt.Errorf("request for pseudo terminal failed: %w", err)
 	}
 
 	if err := sess.Shell(); err != nil {
-		return errors.Wrap(err, "failed to start shell")
+		return fmt.Errorf("failed to start shell: %w", err)
 	}
 	return sess.Wait()
 }
@@ -161,31 +165,44 @@ func (c *Machine) ReadFile(path string, data io.Writer) (err error) {
 	return nil
 }
 
-func (c *Machine) open() (sess *sshlib.Session, close func() error, err error) {
+func (c *Machine) open() (sess *sshlib.Session, close func(), err error) {
 
 	c.monitor.Debug("Trying to open an ssh connection")
-	close = func() error { return nil }
+	close = func() {}
 
 	if c.sshCfg == nil {
 		return nil, close, errors.New("no ssh key passed via infra.Machine.UseKey")
 	}
 
 	address := fmt.Sprintf("%s:%d", c.ip, 22)
-	conn, err := sshlib.Dial("tcp", address, c.sshCfg)
+	d := net.Dialer{}
+	conn, err := d.DialContext(c.ctx, "tcp", address)
 	if err != nil {
-		return nil, close, errors.Wrapf(err, "dialling tcp %s with user %s failed", address, c.remoteUser)
+		return nil, close, fmt.Errorf("dialling tcp at %s failed: %w", address, err)
 	}
 
-	sess, err = conn.NewSession()
+	sshConn, chans, reqs, err := sshlib.NewClientConn(conn, address, c.sshCfg)
 	if err != nil {
-		conn.Close()
-		return sess, close, err
+		mustClose(conn)
+		return nil, close, fmt.Errorf("creating SSH connection at %s with user %s failed: %w", address, c.remoteUser, err)
 	}
-	return sess, func() error {
-		err := sess.Close()
-		err = conn.Close()
-		return err
+
+	sess, err = sshlib.NewClient(sshConn, chans, reqs).NewSession()
+	if err != nil {
+		mustClose(sshConn)
+		mustClose(conn)
+		return nil, close, fmt.Errorf("creating SSH session failed: %w", err)
+	}
+	return sess, func() {
+		mustClose(sess)
+		mustClose(sshConn)
 	}, nil
+}
+
+func mustClose(closer io.Closer) {
+	if err := closer.Close(); err != nil && err.Error() != "EOF" {
+		panic(err)
+	}
 }
 
 func (c *Machine) UseKey(keys ...[]byte) error {

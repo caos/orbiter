@@ -16,10 +16,10 @@ import (
 type gceMachine struct {
 	mntr.Monitor
 	id      string
-	context *context
+	context *svcConfig
 }
 
-func newGCEMachine(context *context, monitor mntr.Monitor, id string) machine {
+func newGCEMachine(context *svcConfig, monitor mntr.Monitor, id string) machine {
 	return &gceMachine{
 		Monitor: monitor,
 		id:      id,

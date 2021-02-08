@@ -1,6 +1,8 @@
 package orb
 
 import (
+	"context"
+
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/clusters"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/clusters/core/infra"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers"
@@ -12,7 +14,7 @@ import (
 
 type MachinesFunc func(monitor mntr.Monitor, desiredTree *tree.Tree, repoURL string) (machineIDs []string, machines map[string]infra.Machine, err error)
 
-func ListMachines(operarorLabels *labels.Operator) MachinesFunc {
+func ListMachines(ctx context.Context, operarorLabels *labels.Operator) MachinesFunc {
 	return func(monitor mntr.Monitor, desiredTree *tree.Tree, repoURL string) (machineIDs []string, machines map[string]infra.Machine, err error) {
 		defer func() {
 			err = errors.Wrapf(err, "building %s failed", desiredTree.Common.Kind)
@@ -27,6 +29,7 @@ func ListMachines(operarorLabels *labels.Operator) MachinesFunc {
 		machines = make(map[string]infra.Machine, 0)
 		machineIDs = make([]string, 0)
 
+		// TODO: Why?
 		for clusterID, clusterTree := range desiredKind.Clusters {
 			clusterCurrent := &tree.Tree{}
 			_, _, _, _, _, err := clusters.GetQueryAndDestroyFuncs(
@@ -50,6 +53,7 @@ func ListMachines(operarorLabels *labels.Operator) MachinesFunc {
 		for provID, providerTree := range desiredKind.Providers {
 
 			providerMachines, err := providers.ListMachines(
+				ctx,
 				monitor.WithFields(map[string]interface{}{"provider": provID}),
 				providerTree,
 				provID,

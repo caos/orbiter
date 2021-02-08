@@ -25,8 +25,8 @@ func Networking(monitor mntr.Monitor, orbConfigPath string, k8sClient *kubernete
 			return err
 		}
 
-		gitClient := git.New(context.Background(), monitor, "orbos", "orbos@caos.ch")
-		if err := gitClient.Configure(orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
+		gitClient := git.New(monitor, "orbos", "orbos@caos.ch")
+		if err := gitClient.Configure(context.TODO(), orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
 			monitor.Error(err)
 			return err
 		}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+
 	"github.com/caos/orbos/cmd/orbctl/cmds"
 	"github.com/caos/orbos/internal/helpers"
 	"github.com/caos/orbos/internal/orb"
@@ -41,7 +42,7 @@ func main() {
 		monitor,
 		ctx,
 		orbConfig,
-		git.New(ctx, monitor, "orbos", "orbos@caos.ch"),
+		git.New(monitor, "orbos", "orbos@caos.ch"),
 		false,
 		false,
 		true,

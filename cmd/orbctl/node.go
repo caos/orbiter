@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -24,8 +25,8 @@ func NodeCommand() *cobra.Command {
 	}
 }
 
-func requireMachines(monitor mntr.Monitor, gitClient *git.Client, orbConfig *orb.Orb, args []string, method func(machine infra.Machine) (required bool, require func(), unrequire func())) error {
-	return machines(monitor, gitClient, orbConfig, func(machineIDs []string, machines map[string]infra.Machine, desired *tree.Tree) error {
+func requireMachines(ctx context.Context, monitor mntr.Monitor, gitClient *git.Client, orbConfig *orb.Orb, args []string, method func(machine infra.Machine) (required bool, require func(), unrequire func())) error {
+	return machines(ctx, monitor, gitClient, orbConfig, func(machineIDs []string, machines map[string]infra.Machine, desired *tree.Tree) error {
 
 		if len(args) <= 0 {
 			if err := survey.AskOne(&survey.MultiSelect{

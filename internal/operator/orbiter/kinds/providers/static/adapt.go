@@ -1,6 +1,8 @@
 package static
 
 import (
+	"context"
+
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/loadbalancers"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/loadbalancers/dynamic"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers/core"
@@ -61,8 +63,10 @@ func AdaptFunc(id string, whitelist dynamic.WhiteListFunc, orbiterCommit, repoUR
 		}
 		currentTree.Parsed = current
 
-		svc := NewMachinesService(monitor, desiredKind, id)
-		return func(nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, _ map[string]interface{}) (ensureFunc orbiter.EnsureFunc, err error) {
+		svcFunc := func(ctx context.Context) *machinesService {
+			return newMachinesService(ctx, monitor, desiredKind, id)
+		}
+		return func(ctx context.Context, nodeAgentsCurrent *common.CurrentNodeAgents, nodeAgentsDesired *common.DesiredNodeAgents, _ map[string]interface{}) (ensureFunc orbiter.EnsureFunc, err error) {
 				defer func() {
 					err = errors.Wrapf(err, "querying %s failed", desiredKind.Common.Kind)
 				}()
@@ -71,8 +75,9 @@ func AdaptFunc(id string, whitelist dynamic.WhiteListFunc, orbiterCommit, repoUR
 					return nil, err
 				}
 
+				svc := svcFunc(ctx)
 				lbQueryFunc := func() (orbiter.EnsureFunc, error) {
-					return lbQuery(nodeAgentsCurrent, nodeAgentsDesired, nil)
+					return lbQuery(ctx, nodeAgentsCurrent, nodeAgentsDesired, nil)
 				}
 
 				if _, err := orbiter.QueryFuncGoroutine(lbQueryFunc); err != nil {
@@ -93,6 +98,7 @@ func AdaptFunc(id string, whitelist dynamic.WhiteListFunc, orbiterCommit, repoUR
 					return err
 				}
 
+				svc := svcFunc(context.Background())
 				if err := svc.updateKeys(); err != nil {
 					return err
 				}
@@ -119,7 +125,7 @@ func AdaptFunc(id string, whitelist dynamic.WhiteListFunc, orbiterCommit, repoUR
 					return nil
 				}
 
-				return core.ConfigureNodeAgents(svc, monitor, orb)
+				return core.ConfigureNodeAgents(svcFunc(context.Background()), monitor, orb)
 			},
 			migrate,
 			secrets,
