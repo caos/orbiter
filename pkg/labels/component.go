@@ -35,6 +35,7 @@ func (l *Component) UnmarshalYAML(node *yaml.Node) error {
 }
 
 func MustForComponent(l *API, component string) *Component {
+
 	c, err := ForComponent(l, component)
 	if err != nil {
 		panic(err)
