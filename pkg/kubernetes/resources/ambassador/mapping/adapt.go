@@ -1,6 +1,7 @@
 package mapping
 
 import (
+	"github.com/caos/orbos/mntr"
 	"github.com/caos/orbos/pkg/kubernetes"
 	"github.com/caos/orbos/pkg/kubernetes/resources"
 	"github.com/caos/orbos/pkg/labels"
@@ -23,6 +24,7 @@ type CORS struct {
 }
 
 func AdaptFuncToEnsure(
+	monitor mntr.Monitor,
 	namespace string,
 	id labels.IDLabels,
 	grpc bool,
@@ -78,6 +80,16 @@ func AdaptFuncToEnsure(
 		}}
 
 	return func(k8sClient kubernetes.ClientInt) (resources.EnsureFunc, error) {
+		crdName := "mappings.getambassador.io"
+		_, ok, err := k8sClient.CheckCRD(crdName)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			monitor.WithField("name", crdName).Info("crd definition not found, skipping")
+			return func(k8sClient kubernetes.ClientInt) error { return nil }, nil
+		}
+
 		return func(k8sClient kubernetes.ClientInt) error {
 			return k8sClient.ApplyNamespacedCRDResource(group, version, kind, namespace, id.Name(), crd)
 		}, nil

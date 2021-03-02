@@ -350,12 +350,13 @@ func (mr *MockClientIntMockRecorder) ExecInPodOfDeployment(namespace, name, cont
 }
 
 // CheckCRD mocks base method
-func (m *MockClientInt) CheckCRD(name string) (*v1beta12.CustomResourceDefinition, error) {
+func (m *MockClientInt) CheckCRD(name string) (*v1beta12.CustomResourceDefinition, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckCRD", name)
 	ret0, _ := ret[0].(*v1beta12.CustomResourceDefinition)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // CheckCRD indicates an expected call of CheckCRD

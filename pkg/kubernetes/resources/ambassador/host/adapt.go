@@ -1,6 +1,7 @@
 package host
 
 import (
+	"github.com/caos/orbos/mntr"
 	"github.com/caos/orbos/pkg/kubernetes"
 	"github.com/caos/orbos/pkg/kubernetes/resources"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -12,7 +13,9 @@ const (
 	kind    = "Host"
 )
 
-func AdaptFuncToEnsure(namespace, name string, labels map[string]string, hostname string, authority string, privateKeySecret string, selector map[string]string, tlsSecret string) (resources.QueryFunc, error) {
+type AdaptFuncToEnsureFunc func(monitor mntr.Monitor, namespace, name string, labels map[string]string, hostname string, authority string, privateKeySecret string, selector map[string]string, tlsSecret string) (resources.QueryFunc, error)
+
+func AdaptFuncToEnsure(monitor mntr.Monitor, namespace, name string, labels map[string]string, hostname string, authority string, privateKeySecret string, selector map[string]string, tlsSecret string) (resources.QueryFunc, error) {
 	acme := map[string]interface{}{
 		"authority": authority,
 	}
@@ -54,6 +57,16 @@ func AdaptFuncToEnsure(namespace, name string, labels map[string]string, hostnam
 		}}
 
 	return func(k8sClient kubernetes.ClientInt) (resources.EnsureFunc, error) {
+		crdName := "hosts.getambassador.io"
+		_, ok, err := k8sClient.CheckCRD(crdName)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			monitor.WithField("name", crdName).Info("crd definition not found, skipping")
+			return func(k8sClient kubernetes.ClientInt) error { return nil }, nil
+		}
+
 		return func(k8sClient kubernetes.ClientInt) error {
 			return k8sClient.ApplyNamespacedCRDResource(group, version, kind, namespace, name, crd)
 		}, nil
