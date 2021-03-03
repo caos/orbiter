@@ -6,6 +6,8 @@ import (
 )
 
 type InternalConfig struct {
+	AccountName        string
+	ID                 string
 	Domains            []*InternalDomain `yaml:"domains"`
 	Groups             []*Group          `yaml:"groups"`
 	Credentials        *Credentials
@@ -36,10 +38,19 @@ type Group struct {
 }
 
 type InternalDomain struct {
-	Domain     string       `yaml:"domain"`
-	Origin     *Origin      `yaml:"origin"`
-	Subdomains []*Subdomain `yaml:"subdomains"`
-	Rules      []*Rule      `yaml:"rules"`
+	FloatingIP   string
+	Domain       string        `yaml:"domain"`
+	Origin       *Origin       `yaml:"origin"`
+	Subdomains   []*Subdomain  `yaml:"subdomains"`
+	Rules        []*Rule       `yaml:"rules"`
+	LoadBalancer *LoadBalancer `yaml:"loadbalancer"`
+}
+
+type LoadBalancer struct {
+	Create    bool   `yaml:"create"`
+	ClusterID string `yaml:"clusterid"`
+	Region    string `yaml:"region"`
+	Enabled   bool   `yaml:"enabled"`
 }
 
 type Origin struct {

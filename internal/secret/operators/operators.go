@@ -86,7 +86,7 @@ func GetAllSecretsFunc(orb *orb.Orb, binaryVersion *string) func(monitor mntr.Mo
 			}
 			allTrees[networking] = nwYML
 
-			_, _, nwSecrets, err := nwOrb.AdaptFunc(nil)(monitor, nwYML, nil)
+			_, _, nwSecrets, err := nwOrb.AdaptFunc("", nil)(monitor, nwYML, nil)
 			if err != nil {
 				return nil, nil, err
 			}

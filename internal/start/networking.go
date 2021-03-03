@@ -32,7 +32,7 @@ func Networking(monitor mntr.Monitor, orbConfigPath string, k8sClient *kubernete
 			return err
 		}
 
-		takeoff := networking.Takeoff(monitor, gitClient, orb.AdaptFunc(binaryVersion), k8sClient)
+		takeoff := networking.Takeoff(monitor, gitClient, orb.AdaptFunc(orbConfig.URL, binaryVersion), k8sClient)
 
 		go func() {
 			started := time.Now()
