@@ -78,6 +78,7 @@ func main() {
 		orbctlBin(orbctlMain, *orbctldir, "linux", "amd64"),
 		orbctlBin(orbctlMain, *orbctldir, "openbsd", "amd64"),
 		orbctlBin(orbctlMain, *orbctldir, "windows", "amd64"),
+		orbctlBin(orbctlMain, *orbctldir, "darwin", "arm64"),
 	}
 	if *dev {
 		orbctls = []executables.Buildable{orbctlBin(orbctlMain, *orbctldir, runtime.GOOS, "amd64")}
@@ -101,6 +102,10 @@ func main() {
 func orbctlBin(mainPath, outPath, goos, goarch string) executables.Buildable {
 
 	arch := "x86_64"
+	switch goarch {
+	case "arm64":
+		arch = "ARM64"
+	}
 	os := strings.ToUpper(goos[0:1]) + goos[1:]
 	switch goos {
 	case "freebsd":
