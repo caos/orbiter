@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/caos/orbos/pkg/git"
 	"github.com/caos/orbos/pkg/kubernetes"
 	"github.com/caos/orbos/pkg/secret"
 
@@ -27,9 +26,8 @@ func ensureUpScale(
 	k8sClient *kubernetes.Client,
 	oneoff bool,
 	initializeMachine func(infra.Machine, *initializedPool) initializedMachine,
-	gitClient *git.Client,
 	providerK8sSpec infra.Kubernetes,
-) (changed bool, err error) {
+) (done bool, err error) {
 
 	wCount := 0
 	for _, w := range workerPools {
@@ -209,7 +207,6 @@ nodes:
 			string(certKey),
 			k8sClient,
 			imageRepository,
-			gitClient,
 			providerK8sSpec,
 		)
 
@@ -244,7 +241,6 @@ nodes:
 			"",
 			k8sClient,
 			imageRepository,
-			gitClient,
 			providerK8sSpec,
 		); err != nil {
 			return false, errors.Wrapf(err, "joining worker %s failed", worker.infra.ID())

@@ -83,15 +83,7 @@ func AdaptFunc(
 
 		whitelist([]*orbiter.CIDR{&desiredKind.Spec.Networking.PodCidr})
 
-		var kc *string
-		if desiredKind.Spec.Kubeconfig != nil && desiredKind.Spec.Kubeconfig.Value != "" {
-			kc = &desiredKind.Spec.Kubeconfig.Value
-		}
-		k8sClient, err := kubernetes.NewK8sClient(monitor, kc)
-		if err != nil {
-			// ignore
-			err = nil
-		}
+		k8sClient := tryToConnect(monitor, desiredKind)
 
 		if k8sClient != nil && deployOrbiter {
 			if err := kubernetes.EnsureCaosSystemNamespace(monitor, k8sClient); err != nil {

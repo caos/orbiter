@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"sort"
+
+	"github.com/caos/orbos/pkg/kubernetes"
 )
 
 type Address struct {
@@ -23,7 +25,7 @@ type ProviderCurrent interface {
 }
 
 type Kubernetes struct {
-	Apply           io.Reader
+	CleanupAndApply func(k8sClient kubernetes.ClientInt) (io.Reader, error)
 	CloudController CloudControllerManager
 }
 

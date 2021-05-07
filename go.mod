@@ -17,6 +17,7 @@ require (
 	github.com/golang/protobuf v1.4.2
 	github.com/google/go-github/v31 v31.0.0
 	github.com/google/uuid v1.2.0
+	github.com/influxdata/influxdb1-client v0.0.0-20200827194710-b269163b24ab // indirect
 	github.com/kataras/tablewriter v0.0.0-20180708051242-e063d29b7c23
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/landoop/tableprinter v0.0.0-20200805134727-ea32388e35c1

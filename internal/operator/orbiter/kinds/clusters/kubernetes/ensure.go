@@ -4,6 +4,7 @@ import (
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/clusters/core/infra"
 	"github.com/caos/orbos/mntr"
 	"github.com/caos/orbos/pkg/git"
+	"github.com/caos/orbos/pkg/helper"
 	"github.com/caos/orbos/pkg/kubernetes"
 )
 
@@ -41,19 +42,18 @@ func ensure(
 
 	targetVersion := ParseString(desired.Spec.Versions.Kubernetes)
 
-	upgradingDone, err := ensureSoftware(
+	done, err = ensureSoftware(
 		monitor,
 		targetVersion,
 		k8sClient,
 		controlplaneMachines,
 		workerMachines)
-	if err != nil || !upgradingDone {
+	if err != nil || !done {
 		monitor.Info("Upgrading is not done yet")
-		return upgradingDone, err
+		return done, err
 	}
 
-	var scalingDone bool
-	scalingDone, err = ensureUpScale(
+	done, err = ensureUpScale(
 		monitor,
 		clusterID,
 		desired,
@@ -70,11 +70,20 @@ func ensure(
 			machine.desiredNodeagent.Software.Merge(target)
 			return *machine
 		},
-		gitClient,
 		providerK8sSpec,
 	)
-	if !scalingDone {
+	if err != nil {
+		return done, err
+	}
+
+	if !done {
 		monitor.Info("Scaling is not done yet")
 	}
-	return scalingDone, err
+
+	// When bootstrapping, the admin config was just generated
+	if helper.IsNil(k8sClient) {
+		k8sClient = tryToConnect(monitor, desired)
+	}
+
+	return done, ensureK8sPlugins(monitor, gitClient, k8sClient, *desired, providerK8sSpec)
 }
