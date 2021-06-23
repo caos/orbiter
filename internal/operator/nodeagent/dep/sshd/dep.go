@@ -94,7 +94,7 @@ func (s *sshdDep) Current() (pkg common.Package, err error) {
 	return pkg, nil
 }
 
-func (s *sshdDep) Ensure(remove common.Package, ensure common.Package) error {
+func (s *sshdDep) Ensure(remove common.Package, ensure common.Package, _ bool) error {
 
 	appendLines := []string{"GSSAPIAuthentication no"}
 	listenAddress := ensure.Config["listenaddress"]

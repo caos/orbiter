@@ -71,7 +71,7 @@ func (s *nginxDep) Current() (pkg common.Package, err error) {
 	return pkg, nil
 }
 
-func (s *nginxDep) Ensure(remove common.Package, ensure common.Package) error {
+func (s *nginxDep) Ensure(remove common.Package, ensure common.Package, leaveOSRepositories bool) error {
 
 	if err := selinux.EnsurePermissive(s.monitor, s.os, remove); err != nil {
 		return err
@@ -84,21 +84,12 @@ func (s *nginxDep) Ensure(remove common.Package, ensure common.Package) error {
 		return nil
 	}
 
-	// TODO: I think this should be removed, as this prevents updating nginx
+	// TODO: Why does this not prevent updating nginx?
 	if _, ok := remove.Config["nginx.conf"]; !ok {
 
-		try := func() error {
-			return s.manager.Install(&dep.Software{
-				Package: "nginx",
-				Version: strings.TrimLeft(ensure.Version, "v"),
-			})
-		}
+		swmonitor := s.monitor.WithField("software", "NGINX")
 
-		if err := try(); err != nil {
-
-			swmonitor := s.monitor.WithField("software", "NGINX")
-			swmonitor.Error(fmt.Errorf("installing software from existing repo failed, trying again after adding repo: %w", err))
-
+		if !leaveOSRepositories {
 			repoURL := "http://nginx.org/packages/centos/$releasever/$basearch/"
 			if err := ioutil.WriteFile("/etc/yum.repos.d/nginx.repo", []byte(fmt.Sprintf(`[nginx-stable]
 name=nginx stable repo
@@ -111,16 +102,18 @@ module_hotfixes=true`, repoURL)), 0600); err != nil {
 			}
 
 			swmonitor.WithField("url", repoURL).Info("repo added")
-
-			if err := try(); err != nil {
-				swmonitor.Error(fmt.Errorf("installing software from %s failed: %w", repoURL, err))
-				return err
-			}
 		}
 
-		if err := os.MkdirAll("/etc/nginx", 0700); err != nil {
-			return err
+		if err := s.manager.Install(&dep.Software{
+			Package: "nginx",
+			Version: strings.TrimLeft(ensure.Version, "v"),
+		}); err != nil {
+			return fmt.Errorf("installing software failed: %w", err)
 		}
+	}
+
+	if err := os.MkdirAll("/etc/nginx", 0700); err != nil {
+		return err
 	}
 
 	if err := ioutil.WriteFile("/etc/nginx/nginx.conf", []byte(ensureCfg), 0600); err != nil {

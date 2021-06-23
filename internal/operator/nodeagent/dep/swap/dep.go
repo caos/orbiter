@@ -73,7 +73,7 @@ func (s *swapDep) Current() (pkg common.Package, err error) {
 	}
 }
 
-func (s *swapDep) Ensure(remove common.Package, ensure common.Package) error {
+func (s *swapDep) Ensure(remove common.Package, ensure common.Package, _ bool) error {
 	buf := new(bytes.Buffer)
 	defer buf.Reset()
 

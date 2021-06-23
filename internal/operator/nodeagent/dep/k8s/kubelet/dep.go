@@ -58,14 +58,14 @@ func (k *kubeletDep) Current() (pkg common.Package, err error) {
 	return pkg, selinux.Current(k.os, &pkg)
 }
 
-func (k *kubeletDep) Ensure(remove common.Package, install common.Package) error {
+func (k *kubeletDep) Ensure(remove common.Package, install common.Package, leaveOSRepositories bool) error {
 
 	if err := selinux.EnsurePermissive(k.monitor, k.os, remove); err != nil {
 		return err
 	}
 
 	if k.os != dep.CentOS {
-		return k.ensurePackage(remove, install)
+		return k.ensurePackage(remove, install, leaveOSRepositories)
 	}
 
 	errBuf := new(bytes.Buffer)
@@ -82,12 +82,12 @@ func (k *kubeletDep) Ensure(remove common.Package, install common.Package) error
 	}
 	errBuf.Reset()
 
-	return k.ensurePackage(remove, install)
+	return k.ensurePackage(remove, install, leaveOSRepositories)
 }
 
-func (k *kubeletDep) ensurePackage(remove common.Package, install common.Package) error {
+func (k *kubeletDep) ensurePackage(remove common.Package, install common.Package, leaveOSRepositories bool) error {
 
-	if err := k.common.Ensure(remove, install); err != nil {
+	if err := k.common.Ensure(remove, install, leaveOSRepositories); err != nil {
 		return err
 	}
 

@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 
 	"github.com/caos/orbos/internal/operator/common"
@@ -34,11 +36,15 @@ func (l *loggedDep) Current() (common.Package, error) {
 	return current, errors.Wrapf(err, "querying installed package for dependency %s failed", l.String())
 }
 
-func (l *loggedDep) Ensure(remove common.Package, install common.Package) error {
-	return errors.Wrapf(
-		l.unwrapped.Ensure(remove, install),
-		"uninstalling version %s and installing version %s failed for dependency %s",
-		remove,
-		install,
-		l.unwrapped.String())
+func (l *loggedDep) Ensure(remove common.Package, install common.Package, leaveOSRepositories bool) error {
+
+	var leavingOSREpositories string
+	if leaveOSRepositories {
+		leavingOSREpositories = "leaving OS repositories "
+	}
+
+	if err := l.unwrapped.Ensure(remove, install, leaveOSRepositories); err != nil {
+		return fmt.Errorf("uninstalling version %s and installing version %s %sfailed for dependency %s: %w", remove, install, leavingOSREpositories, l.unwrapped.String(), err)
+	}
+	return nil
 }

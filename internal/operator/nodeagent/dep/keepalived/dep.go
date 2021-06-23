@@ -119,7 +119,7 @@ func (s *keepaliveDDep) Current() (pkg common.Package, err error) {
 	return pkg, err
 }
 
-func (s *keepaliveDDep) Ensure(remove common.Package, ensure common.Package) error {
+func (s *keepaliveDDep) Ensure(remove common.Package, ensure common.Package, _ bool) error {
 
 	if err := selinux.EnsurePermissive(s.monitor, s.os, remove); err != nil {
 		return err

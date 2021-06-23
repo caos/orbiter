@@ -32,7 +32,7 @@ func (c *Common) Current() (pkg common.Package, err error) {
 	return pkg, nil
 }
 
-func (c *Common) Ensure(remove common.Package, install common.Package) (err error) {
+func (c *Common) Ensure(remove common.Package, install common.Package, leaveOSRepositories bool) (err error) {
 
 	defer func() {
 		if err != nil {
@@ -40,43 +40,34 @@ func (c *Common) Ensure(remove common.Package, install common.Package) (err erro
 		}
 	}()
 
-	pkgVersion := strings.TrimLeft(install.Version, "v") + "-0"
-	if c.os == dep.Ubuntu {
-		pkgVersion += "0"
-	}
-	err = c.manager.Install(&dep.Software{Package: c.pkg, Version: pkgVersion})
-	if err == nil {
-		return nil
-	}
-	switch c.os {
-	case dep.Ubuntu:
-		return c.manager.Add(&dep.Repository{
-			KeyURL:         "https://packages.cloud.google.com/apt/doc/apt-key.gpg",
-			KeyFingerprint: "",
-			Repository:     "deb https://apt.kubernetes.io/ kubernetes-xenial main",
-		})
-	case dep.CentOS:
-		return ioutil.WriteFile("/etc/yum.repos.d/kubernetes.repo", []byte(`[kubernetes]
+	if !leaveOSRepositories {
+		switch c.os {
+		case dep.Ubuntu:
+			if err := c.manager.Add(&dep.Repository{
+				KeyURL:         "https://packages.cloud.google.com/apt/doc/apt-key.gpg",
+				KeyFingerprint: "",
+				Repository:     "deb https://apt.kubernetes.io/ kubernetes-xenial main",
+			}); err != nil {
+				return err
+			}
+		case dep.CentOS:
+			if err := ioutil.WriteFile("/etc/yum.repos.d/kubernetes.repo", []byte(`[kubernetes]
 name=Kubernetes
 baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
 enabled=1
 gpgcheck=1
 repo_gpgcheck=1
-gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg`), 0600)
-
-		//		errBuf := new(bytes.Buffer)
-		//		defer errBuf.Reset()
-		//
-		//		cmd := exec.Command("yum-config-manager", "--save", "--setopt=kubernetes.skip_if_unavailable=true")
-		//		cmd.Stderr = &errBuf
-		//		if c.monitor.IsVerbose() {
-		//			fmt.Println(strings.Join(cmd.Args, " "))
-		//			cmd.Stdout = os.Stdout
-		//		}
-		//		if err := cmd.Run(); err != nil {
-		//			return errors.Wrapf(err, "unholding installed package failed with stderr %s", errBuf.String())
-		//		}
-
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg`), 0600); err != nil {
+				return err
+			}
+		default:
+			return errors.New("unknown OS")
+		}
 	}
-	return errors.New("unknown OS")
+
+	pkgVersion := strings.TrimLeft(install.Version, "v") + "-0"
+	if c.os == dep.Ubuntu {
+		pkgVersion += "0"
+	}
+	return c.manager.Install(&dep.Software{Package: c.pkg, Version: pkgVersion})
 }

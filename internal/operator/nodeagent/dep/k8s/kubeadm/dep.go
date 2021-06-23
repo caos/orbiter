@@ -44,6 +44,6 @@ func (k *kubeadmDep) Current() (common.Package, error) {
 	return k.common.Current()
 }
 
-func (k *kubeadmDep) Ensure(remove common.Package, install common.Package) error {
-	return k.common.Ensure(remove, install)
+func (k *kubeadmDep) Ensure(remove common.Package, install common.Package, leaveOSRepositories bool) error {
+	return k.common.Ensure(remove, install, leaveOSRepositories)
 }

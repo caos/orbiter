@@ -10,7 +10,8 @@ import (
 )
 
 type NodeAgentSpec struct {
-	ChangesAllowed bool
+	ChangesAllowed      bool
+	LeaveOSRepositories bool
 	//	RebootEnabled  bool
 	Software       *Software
 	Networking     *Networking

@@ -76,7 +76,7 @@ func extractArguments(content []byte) (string, string) {
 	return match[1], match[2]
 }
 
-func (s *healthDep) Ensure(_ common.Package, ensure common.Package) error {
+func (s *healthDep) Ensure(_ common.Package, ensure common.Package, _ bool) error {
 
 	files, _ := ioutil.ReadDir(dir)
 	for _, file := range files {

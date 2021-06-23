@@ -86,7 +86,7 @@ func (s *sysctlDep) Current() (pkg common.Package, err error) {
 	return pkg, nil
 }
 
-func (s *sysctlDep) Ensure(_ common.Package, ensure common.Package) error {
+func (s *sysctlDep) Ensure(_ common.Package, ensure common.Package, _ bool) error {
 
 	if err := ioutil.WriteFile("/etc/sysctl.d/90-orbiter.conf", []byte(fmt.Sprintf(
 		`%s = %s

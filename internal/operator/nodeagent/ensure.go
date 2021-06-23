@@ -45,7 +45,7 @@ type Converter interface {
 
 type Installer interface {
 	Current() (common.Package, error)
-	Ensure(uninstall common.Package, install common.Package) error
+	Ensure(uninstall, install common.Package, leaveOSRepositories bool) error
 	Equals(other Installer) bool
 	Is(other Installer) bool
 	fmt.Stringer
@@ -164,7 +164,7 @@ func prepareQuery(
 					return dependency.Installer.String()
 				}, divergentSw)).Info("Ensuring software")
 			}
-			ensureDep := ensureFunc(monitor, conv, curr)
+			ensureDep := ensureFunc(monitor, conv, curr, desired.LeaveOSRepositories)
 			_, err := deriveTraverse(ensureDep, divergentSw)
 			return err
 		}, nil
@@ -187,7 +187,7 @@ func divergent(dep *Dependency) bool {
 	return !dep.Desired.Equals(common.Package{}) && !dep.Desired.Equals(dep.Current)
 }
 
-func ensureFunc(monitor mntr.Monitor, conv Converter, curr *common.NodeAgentCurrent) func(dep *Dependency) (*Dependency, error) {
+func ensureFunc(monitor mntr.Monitor, conv Converter, curr *common.NodeAgentCurrent, leaveOSRepositories bool) func(dep *Dependency) (*Dependency, error) {
 	return func(dep *Dependency) (*Dependency, error) {
 		monitor.WithFields(map[string]interface{}{
 			"dependency": dep.Installer,
@@ -195,7 +195,7 @@ func ensureFunc(monitor mntr.Monitor, conv Converter, curr *common.NodeAgentCurr
 			"to":         dep.Desired.Version,
 		}).Info("Ensuring dependency")
 
-		if err := dep.Installer.Ensure(dep.Current, dep.Desired); err != nil {
+		if err := dep.Installer.Ensure(dep.Current, dep.Desired, leaveOSRepositories); err != nil {
 			return dep, err
 		}
 

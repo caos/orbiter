@@ -102,7 +102,7 @@ func (c *criDep) Current() (pkg common.Package, err error) {
 	return pkg, nil
 }
 
-func (c *criDep) Ensure(_ common.Package, install common.Package) error {
+func (c *criDep) Ensure(_ common.Package, install common.Package, leaveOSRepositories bool) error {
 
 	if install.Config == nil {
 		return errors.New("Docker config is nil")
@@ -129,9 +129,9 @@ func (c *criDep) Ensure(_ common.Package, install common.Package) error {
 
 	switch c.os.OperatingSystem {
 	case dep.Ubuntu:
-		return c.ensureUbuntu(fields[0], version)
+		return c.ensureUbuntu(fields[0], version, leaveOSRepositories)
 	case dep.CentOS:
-		return c.ensureCentOS(fields[0], version)
+		return c.ensureCentOS(fields[0], version, leaveOSRepositories)
 	}
 	return errors.Errorf("Operating %s system is not supported", c.os)
 }
