@@ -1,5 +1,7 @@
 package helm
 
+import "github.com/caos/orbos/pkg/kubernetes/k8s"
+
 type Rbac struct {
 	Create     bool `yaml:"create"`
 	PspEnabled bool `yaml:"pspEnabled"`
@@ -62,9 +64,9 @@ type Values struct {
 	Image               *Image               `yaml:"image,omitempty"`
 	ImagePullSecrets    []interface{}        `yaml:"imagePullSecrets,omitempty"`
 	Args                []string             `yaml:"args,omitempty"`
-	Resources           struct{}             `yaml:"resources,omitempty"`
-	NodeSelector        struct{}             `yaml:"nodeSelector,omitempty"`
-	Tolerations         []interface{}        `yaml:"tolerations,omitempty"`
+	Resources           *k8s.Resources       `yaml:"resources,omitempty"`
+	NodeSelector        map[string]string    `yaml:"nodeSelector,omitempty"`
+	Tolerations         k8s.Tolerations      `yaml:"tolerations,omitempty"`
 	Affinity            struct{}             `yaml:"affinity,omitempty"`
 	Replicas            int                  `yaml:"replicas,omitempty"`
 	ExtraContainers     []interface{}        `yaml:"extraContainers"`

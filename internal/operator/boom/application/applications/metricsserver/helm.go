@@ -29,9 +29,23 @@ func (m *MetricsServer) SpecToHelmValues(monitor mntr.Monitor, toolset *toolsets
 	}
 	values := helm.DefaultValues(imageTags, image)
 
-	// if spec.ReplicaCount != 0 {
-	// 	values.ReplicaCount = toolset.MetricsServer.ReplicaCount
-	// }
+	if toolset != nil && toolset.MetricsServer != nil {
+		if toolset.MetricsServer.Resources != nil {
+			values.Resources = toolset.MetricsServer.Resources
+		}
+
+		if toolset.MetricsServer.NodeSelector != nil {
+			for k, v := range toolset.MetricsServer.NodeSelector {
+				values.NodeSelector[k] = v
+			}
+		}
+
+		if toolset.MetricsServer.Tolerations != nil {
+			for _, tol := range toolset.MetricsServer.Tolerations {
+				values.Tolerations = append(values.Tolerations, tol)
+			}
+		}
+	}
 
 	return values
 }
