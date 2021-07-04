@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# getter for gopass and secret yaml creation
+
 set -e
 [[ `uname` = "Linux" ]] && ENCODE="base64 --wrap=0" || ENCODE="base64"
 
@@ -10,7 +10,7 @@ data:
   password: $(echo -n "${2}" | $ENCODE)
 kind: Secret
 metadata:
-  name: grafana-cloud
+  name: loki-grafana-cloud
   namespace: caos-system
 type: Opaque
 ---
