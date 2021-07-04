@@ -107,10 +107,6 @@ func AdaptFunc(
 				return destroy(ctx, current)
 			}, func(orb orbcfg.Orb) error {
 
-				if err := desiredKind.validateAPIToken(); err != nil {
-					return err
-				}
-
 				if err := lbConfigure(orb); err != nil {
 					return err
 				}
@@ -126,6 +122,10 @@ func AdaptFunc(
 						Private: &secret.Secret{Value: priv},
 						Public:  &secret.Secret{Value: pub},
 					}
+				}
+
+				if err := desiredKind.validateAPIToken(); err != nil {
+					return nil
 				}
 
 				if err := ctx.machinesService.use(desiredKind.Spec.SSHKey); err != nil {

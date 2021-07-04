@@ -130,11 +130,6 @@ func AdaptFunc(
 				return destroy(ctx, delegates)
 			}, func(orb orbcfg.Orb) error {
 
-				if err := desiredKind.validateJSONKey(); err != nil {
-					// TODO: Create service account and write its json key to desiredKind.Spec.JSONKey and push repo
-					return err
-				}
-
 				if err := lbConfigure(orb); err != nil {
 					return err
 				}
@@ -155,6 +150,12 @@ func AdaptFunc(
 				svc, err := svcFunc()
 				if err != nil {
 					return err
+				}
+
+				if err := desiredKind.validateJSONKey(); err != nil {
+					// TODO: Create service account and write its json key to desiredKind.Spec.JSONKey and push repo
+					// return err
+					return nil
 				}
 
 				if err := svc.use(desiredKind.Spec.SSHKey); err != nil {
