@@ -4,11 +4,14 @@ At CAOS we are extremely grateful for security aware people that disclose vulner
 
 ## Supported Versions
 
-After the initial Release the following version support will apply
+The following version support applies
 
 | Version | Supported                               |
 | ------- | ------------------                      |
-| 1.x.x   | :white_check_mark: (not yet available)  |
+| 4.x.x   | :white_check_mark:  |
+| 3.x.x   | :white_check_mark:  |
+| 2.x.x   | :white_check_mark:                      |
+| 1.x.x   | :white_check_mark:                      |
 | 0.x.x   | :x:                                     |
 
 ## Reporting a vulnerability
