@@ -136,12 +136,6 @@ networking:
   serviceSubnet: "{{ .ServiceSubnet }}"
 scheduler: {}
 
----
-
-kind: KubeletConfiguration
-apiVersion: kubelet.config.k8s.io/v1beta1
-cgroupDriver: systemd
-
 ---{{if .JoinAt }}
 kind: JoinConfiguration
 apiVersion: kubeadm.k8s.io/v1beta2
@@ -154,6 +148,7 @@ discovery:
   timeout: 5m0s
 nodeRegistration:
   kubeletExtraArgs:
+    cgroup-driver: "systemd"
     node-ip: "{{ .Node.IP }}"{{if .ProviderK8sSpec.CloudController.Supported}}
     cloud-provider: "{{ .ProviderK8sSpec.CloudController.ProviderName }}"
     cloud-config: "{{ .CloudConfigPath }}"{{end}}
@@ -180,6 +175,7 @@ nodeRegistration:
 #	criSocket: /var/run/dockershim.sock
   name:  "{{ .Node.ID }}"
   kubeletExtraArgs:
+    cgroup-driver: "systemd"
     node-ip: "{{ .Node.IP }}"{{if .ProviderK8sSpec.CloudController.Supported }}
     cloud-provider: "{{ .ProviderK8sSpec.CloudController.ProviderName }}"
     cloud-config: "{{ .CloudConfigPath }}"{{end}}
