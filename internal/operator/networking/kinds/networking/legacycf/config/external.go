@@ -9,14 +9,11 @@ import (
 	core2 "github.com/caos/orbos/internal/operator/core"
 	"github.com/caos/orbos/internal/operator/networking/kinds/networking/core"
 	"github.com/caos/orbos/pkg/labels"
-
-	"github.com/caos/orbos/internal/operator/orbiter"
 )
 
 type ExternalConfig struct {
 	Verbose       bool
 	Domain        string
-	IP            orbiter.IPAddress
 	Rules         []*Rule
 	Groups        []*Group     `yaml:"groups"`
 	Credentials   *Credentials `yaml:"credentials"`
@@ -28,7 +25,6 @@ func (i *ExternalConfig) IsZero() bool {
 	if (i.Credentials == nil || i.Credentials.IsZero()) &&
 		!i.Verbose &&
 		i.Domain == "" &&
-		i.IP == "" &&
 		i.Groups == nil &&
 		i.Prefix == "" &&
 		i.Rules == nil &&
@@ -58,7 +54,8 @@ func (e *ExternalConfig) Validate() error {
 	if e.Domain == "" {
 		return errors.New("no domain configured")
 	}
-	return e.IP.Validate()
+
+	return nil
 }
 
 func (e *ExternalConfig) ValidateSecrets() error {
@@ -80,13 +77,7 @@ func (e *ExternalConfig) ValidateSecrets() error {
 
 func (e *ExternalConfig) internalDomain() (*InternalDomain, *current) {
 
-	// TODO: Remove
-	subdomains := []*Subdomain{
-		subdomain("accounts", e.IP),
-		subdomain("api", e.IP),
-		subdomain("console", e.IP),
-		subdomain("issuer", e.IP),
-	}
+	subdomains := make([]*Subdomain, 0)
 	for _, sd := range e.AdditionalDNS {
 		subdomains = append(subdomains, sd)
 	}
@@ -97,51 +88,21 @@ func (e *ExternalConfig) internalDomain() (*InternalDomain, *current) {
 			Rules:      e.Rules,
 		},
 		&current{
-			domain:            e.Domain,
-			issureSubdomain:   "issuer",
-			consoleSubdomain:  "console",
-			apiSubdomain:      "api",
-			accountsSubdomain: "accounts",
-			tlsCertName:       "tls-cert-wildcard",
+			domain:      e.Domain,
+			tlsCertName: "tls-cert-wildcard",
 		}
-}
-
-func subdomain(subdomain string, ip orbiter.IPAddress) *Subdomain {
-	return &Subdomain{
-		Subdomain: subdomain,
-		IP:        string(ip),
-		Proxied:   true,
-		TTL:       0,
-		Type:      "A",
-	}
 }
 
 var _ core.NetworkingCurrent = (*current)(nil)
 
 type current struct {
-	domain            string `yaml:"-"`
-	issureSubdomain   string `yaml:"-"`
-	consoleSubdomain  string `yaml:"-"`
-	apiSubdomain      string `yaml:"-"`
-	accountsSubdomain string `yaml:"-"`
-	tlsCertName       string `yaml:"-"`
-	ReadyCertificate  core2.EnsureFunc
+	domain           string `yaml:"-"`
+	tlsCertName      string `yaml:"-"`
+	ReadyCertificate core2.EnsureFunc
 }
 
 func (c *current) GetDomain() string {
 	return c.domain
-}
-func (c *current) GetIssuerSubDomain() string {
-	return c.issureSubdomain
-}
-func (c *current) GetConsoleSubDomain() string {
-	return c.consoleSubdomain
-}
-func (c *current) GetAPISubDomain() string {
-	return c.apiSubdomain
-}
-func (c *current) GetAccountsSubDomain() string {
-	return c.accountsSubdomain
 }
 func (c *current) GetReadyCertificate() core2.EnsureFunc {
 	return c.ReadyCertificate
