@@ -2,9 +2,6 @@ package gce
 
 import (
 	"bytes"
-	"fmt"
-	"io"
-	"strings"
 
 	"github.com/caos/orbos/internal/executables"
 
@@ -37,26 +34,26 @@ func (c *Current) Cleanupped() <-chan error {
 func (c *Current) Kubernetes() infra.Kubernetes {
 	return infra.Kubernetes{
 		Apply: bytes.NewReader(executables.PreBuilt("kubernetes_gce.yaml")),
-		CloudController: infra.CloudControllerManager{
-			Supported: true,
-			CloudConfig: func(machine infra.Machine) io.Reader {
-				instance := machine.(*instance)
-				ctx := instance.context
-				return strings.NewReader(fmt.Sprintf(`[Global]
-project-id = "%s"
-network-name = "%s"
-node-instance-prefix = "orbos-"
-multizone = false
-local-zone = "%s"
-container-api-endpoint = "Don't use container API'"
-`,
-					ctx.projectID,
-					ctx.networkName,
-					ctx.desired.Zone,
-				))
-			},
-			ProviderName: "external",
-		},
+		/*		CloudController: infra.CloudControllerManager{
+					Supported: true,
+					CloudConfig: func(machine infra.Machine) io.Reader {
+						instance := machine.(*instance)
+						ctx := instance.context
+						return strings.NewReader(fmt.Sprintf(`[Global]
+				project-id = "%s"
+				network-name = "%s"
+				node-instance-prefix = "orbos-"
+				multizone = true
+				regional = true
+				container-api-endpoint = "Don't use container API'"
+				`,
+							ctx.projectID,
+							ctx.networkName,
+							//instance.Zone(),
+						))
+					},
+					ProviderName: "external",
+				},*/
 	}
 }
 

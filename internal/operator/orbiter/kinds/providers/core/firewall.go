@@ -42,7 +42,8 @@ func DesireInternalOSFirewall(
 		if err != nil {
 			return false, err
 		}
-		for _, machine := range poolMachines {
+		for idx := range poolMachines {
+			machine := poolMachines[idx]
 			machines = append(machines, machine)
 			ips = append(ips, machine.IP()+"/32")
 		}

@@ -16,13 +16,15 @@ import (
 type gceMachine struct {
 	mntr.Monitor
 	id      string
+	zone    string
 	context *context
 }
 
-func newGCEMachine(context *context, monitor mntr.Monitor, id string) machine {
+func newGCEMachine(context *context, monitor mntr.Monitor, id string, zone string) machine {
 	return &gceMachine{
 		Monitor: monitor,
 		id:      id,
+		zone:    zone,
 		context: context,
 	}
 }
@@ -31,6 +33,10 @@ func resetBuffer(buffer *bytes.Buffer) {
 	if buffer != nil {
 		buffer.Reset()
 	}
+}
+
+func (c *gceMachine) Zone() string {
+	return c.zone
 }
 
 func (c *gceMachine) Execute(stdin io.Reader, command string) ([]byte, error) {
@@ -56,7 +62,7 @@ func (c *gceMachine) execute(stdin io.Reader, command string) (outBuf *bytes.Buf
 		cmd := exec.Command(gcloud,
 			"compute",
 			"ssh",
-			"--zone", c.context.desired.Zone,
+			"--zone", c.zone,
 			fmt.Sprintf("orbiter@%s", c.id),
 			"--tunnel-through-iap",
 			"--project", c.context.projectID,
@@ -88,7 +94,7 @@ func (c *gceMachine) Shell() error {
 		cmd := exec.Command(gcloud,
 			"compute",
 			"ssh",
-			"--zone", c.context.desired.Zone,
+			"--zone", c.zone,
 			fmt.Sprintf("orbiter@%s", c.id),
 			"--tunnel-through-iap",
 			"--project", c.context.projectID,

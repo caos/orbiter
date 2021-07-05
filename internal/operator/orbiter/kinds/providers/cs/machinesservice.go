@@ -67,6 +67,15 @@ func newMachinesService(context *context, oneoff bool) *machinesService {
 	}
 }
 
+func (m *machinesService) DesiredMachines(poolName string, instances int) int {
+	_, ok := m.context.desired.Pools[poolName]
+	if !ok {
+		return 0
+	}
+
+	return instances
+}
+
 func (m *machinesService) use(key *SSHKey) error {
 	if key == nil || key.Private == nil || key.Public == nil || key.Private.Value == "" || key.Public.Value == "" {
 		return errors.New("machines are not connectable. have you configured the orb by running orbctl configure?")
@@ -75,7 +84,7 @@ func (m *machinesService) use(key *SSHKey) error {
 	return nil
 }
 
-func (m *machinesService) Create(poolName string) (infra.Machine, error) {
+func (m *machinesService) Create(poolName string, _ int) (infra.Machines, error) {
 
 	desired, ok := m.context.desired.Pools[poolName]
 	if !ok {
@@ -160,7 +169,7 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 	}
 
 	monitor.Info("Machine created")
-	return infraMachine, nil
+	return []infra.Machine{infraMachine}, nil
 }
 
 func (m *machinesService) toMachine(server *cloudscale.Server, monitor mntr.Monitor, pool *Pool, poolName string) (*machine, error) {

@@ -452,7 +452,8 @@ http {
 									return false, err
 								}
 
-								for _, machine := range destMachines {
+								for idx := range destMachines {
+									machine := destMachines[idx]
 									desireNodeAgent(machine, common.ToFirewall("internal", destFW), common.Package{}, common.Package{})
 									probe("Upstream", machine.IP(), uint16(transport.BackendPort), *transport.ProxyProtocol, transport.HealthChecks, *transport)
 									if vrrp != nil || forPool != dest {

@@ -15,6 +15,7 @@ type Desired struct {
 }
 
 type Pool struct {
+	Multizonal      []string
 	OSImage         string
 	MinCPUCores     int
 	MinMemoryGB     int

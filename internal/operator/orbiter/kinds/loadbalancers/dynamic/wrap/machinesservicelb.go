@@ -43,17 +43,22 @@ func (i *CmpSvcLB) InitializeDesiredNodeAgents() (bool, error) {
 	return done, nil
 }
 
-func (i *CmpSvcLB) Create(poolName string) (infra.Machine, error) {
-	cmp, err := i.MachinesService.Create(poolName)
+func (i *CmpSvcLB) Create(poolName string, desiredInstances int) (infra.Machines, error) {
+	cmp, err := i.MachinesService.Create(poolName, desiredInstances)
 	if err != nil {
 		return nil, err
 	}
 
 	_, err = i.desire(poolName)
-	return machine(cmp, func() error {
-		_, err := i.desire(poolName)
-		return err
-	}), err
+	machines := make([]infra.Machine, 0)
+
+	for _, infraMachine := range cmp {
+		machines = append(machines, machine(infraMachine, func() error {
+			_, err := i.desire(poolName)
+			return err
+		}))
+	}
+	return machines, err
 }
 
 func (c *CmpSvcLB) desire(selfPool string) (bool, error) {

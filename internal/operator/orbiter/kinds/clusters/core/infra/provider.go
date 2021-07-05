@@ -39,10 +39,11 @@ type Ingress struct {
 }
 
 type Pool interface {
+	DesiredMembers(instances int) int
 	EnsureMembers() error
 	EnsureMember(Machine) error
 	GetMachines() (Machines, error)
-	AddMachine() (Machine, error)
+	AddMachine(desiredInstances int) (Machines, error)
 }
 
 type Machine interface {

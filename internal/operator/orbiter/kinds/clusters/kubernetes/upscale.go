@@ -48,7 +48,7 @@ func ensureUpScale(
 
 		if pool.upscaling > 0 {
 			upscalingDone = false
-			machines, alignErr := newMachines(pool.infra, pool.upscaling)
+			machines, alignErr := newMachines(pool.infra, pool.upscaling, pool.desired.Nodes)
 			if alignErr != nil {
 				err = helpers.Concat(err, alignErr)
 				return

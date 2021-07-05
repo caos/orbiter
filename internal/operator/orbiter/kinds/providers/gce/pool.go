@@ -86,10 +86,14 @@ func (i *infraPool) ensureMembers(machine infra.Machine) error {
 	return nil
 }
 
+func (i *infraPool) DesiredMembers(instances int) int {
+	return i.machines.DesiredMachines(i.pool, instances)
+}
+
 func (i *infraPool) GetMachines() (infra.Machines, error) {
 	return i.machines.List(i.pool)
 }
 
-func (i *infraPool) AddMachine() (infra.Machine, error) {
-	return i.machines.Create(i.pool)
+func (i *infraPool) AddMachine(desiredInstances int) (infra.Machines, error) {
+	return i.machines.Create(i.pool, desiredInstances)
 }

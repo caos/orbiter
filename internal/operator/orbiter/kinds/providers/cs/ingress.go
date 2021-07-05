@@ -3,8 +3,9 @@ package cs
 import (
 	"bytes"
 	"fmt"
-	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers/core"
 	"strings"
+
+	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers/core"
 
 	"github.com/caos/orbos/mntr"
 
@@ -80,7 +81,8 @@ func allHostedVIPs(hostPools map[string][]*dynamiclbmodel.VIP, service core.Mach
 		if err != nil {
 			return nil, err
 		}
-		for _, machine := range poolMachines {
+		for idx := range poolMachines {
+			machine := poolMachines[idx]
 			vips[machine.ID()] = hostedVIPs(hostPools, machine, current)
 		}
 	}

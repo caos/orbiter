@@ -28,7 +28,8 @@ func DesireOSNetworking(
 		if err != nil {
 			return false, err
 		}
-		for _, machine := range poolMachines {
+		for idx := range poolMachines {
+			machine := poolMachines[idx]
 			machineVips, ok := vips[machine.ID()]
 			if ok && machineVips != nil && len(machineVips) > 0 {
 				doneMachine, err := DesireOSNetworkingForMachine(monitor, nodeAgentsDesired, nodeAgentsCurrent, machine, name, machineVips)
