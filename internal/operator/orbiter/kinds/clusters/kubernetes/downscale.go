@@ -11,6 +11,7 @@ import (
 )
 
 func scaleDown(pools []*initializedPool, k8sClient *kubernetes.Client, uninitializeMachine uninitializeMachineFunc, monitor mntr.Monitor, pdf func(mntr.Monitor) error) error {
+
 	for _, pool := range pools {
 		for _, machine := range pool.downscaling {
 			id := machine.infra.ID()
@@ -28,7 +29,7 @@ func scaleDown(pools []*initializedPool, k8sClient *kubernetes.Client, uninitial
 			}
 
 			if existingK8sNode != nil {
-				if err := k8sClient.Drain(machine.currentMachine, existingK8sNode, kubernetes.Deleting); err != nil {
+				if err := k8sClient.Drain(machine.currentMachine, existingK8sNode, kubernetes.Deleting, true); err != nil {
 					return err
 				}
 			}
@@ -40,15 +41,14 @@ func scaleDown(pools []*initializedPool, k8sClient *kubernetes.Client, uninitial
 				}
 			}
 
-			if existingK8sNode != nil {
-				if err := k8sClient.DeleteNode(id); err != nil {
-				}
+			remove, err := machine.infra.Destroy()
+			if err != nil {
+				return err
 			}
 
-			if !machine.currentMachine.GetUpdating() || machine.currentMachine.GetJoined() {
+			if !machine.currentMachine.GetUpdating() {
 				machine.currentMachine.SetUpdating(true)
-				machine.currentMachine.SetJoined(false)
-				monitor.Changed("Node deleted")
+				monitor.WithField("node", machine.infra.ID()).Changed("Node is ready to be deleted")
 			}
 
 			uninitializeMachine(id)
@@ -59,7 +59,7 @@ func scaleDown(pools []*initializedPool, k8sClient *kubernetes.Client, uninitial
 					"replaced": id,
 				}))
 			}
-			if err := machine.infra.Remove(); err != nil {
+			if err := remove(); err != nil {
 				return err
 			}
 			monitor.WithFields(map[string]interface{}{

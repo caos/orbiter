@@ -18,7 +18,13 @@ func destroy(context *context, current *Current) error {
 		}
 		for idx := range machines {
 			machine := machines[idx]
-			delFuncs = append(delFuncs, machine.Remove)
+			delFuncs = append(delFuncs, func() error {
+				remove, err := machine.Destroy()
+				if err != nil {
+					return err
+				}
+				return remove()
+			})
 		}
 	}
 	return helpers.Fanout(delFuncs)()

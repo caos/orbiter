@@ -30,9 +30,9 @@ jobs:
 
           go mod download
           mkdir -p ./artifacts
-          go run cmd/gen-executables/*.go -version "$VERSION" -commit "${{ github.sha }}" -githubclientid "${{ secrets.GITHUBOAUTHCLIENTID }}" -githubclientsecret "${{ secrets.GITHUBOAUTHCLIENTSECRET }}" --orbctl ./artifacts
+          go run cmd/chore/gen-executables/*.go -version "$VERSION" -commit "${{ github.sha }}" -githubclientid "${{ secrets.GITHUBOAUTHCLIENTID }}" -githubclientsecret "${{ secrets.GITHUBOAUTHCLIENTSECRET }}" --orbctl ./artifacts
 
-          CGO_ENABLED=0 GOOS=linux go build -o ./artifacts/gen-charts  cmd/gen-charts/*.go
+          CGO_ENABLED=0 GOOS=linux go build -o ./artifacts/gen-charts  cmd/chore/gen-charts/*.go
 
           echo "Publishing ORBOS dev-version $VERSION"
           docker login $REGISTRY -u $GITHUB_ACTOR -p $CR_PAT
@@ -105,3 +105,12 @@ jobs:
           asset_path: ./artifacts/orbctl-Windows-x86_64.exe
           asset_name: orbctl Windows x86_64
           asset_content_type: application/octet-stream
+      - name: Trigger E2E Test On StaticProvider
+        if: steps.dev-release.outputs.relbranch != null
+        run: go run ./cmd/chore/e2e/trigger/*.go --branch "${GITHUB_REF#refs/heads/}" --organization caos --repository ORBOS-Test-StaticProvider --access-token "${{ secrets.CR_PAT }}"
+      - name: Trigger E2E Test On GCEProvider
+        if: steps.dev-release.outputs.relbranch != null
+        run: go run ./cmd/chore/e2e/trigger/*.go --branch "${GITHUB_REF#refs/heads/}" --organization caos --repository ORBOS-Test-GCEProvider --access-token "${{ secrets.CR_PAT }}"
+      - name: Trigger E2E Test On CloudscaleProvider
+        if: steps.dev-release.outputs.relbranch != null
+        run: go run ./cmd/chore/e2e/trigger/*.go --branch "${GITHUB_REF#refs/heads/}" --organization caos --repository ORBOS-Test-CloudscaleProvider --access-token "${{ secrets.CR_PAT }}"

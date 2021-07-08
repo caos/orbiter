@@ -11,7 +11,8 @@ import (
 type MachinesService interface {
 	ListPools() ([]string, error)
 	List(poolName string) (infra.Machines, error)
-	Create(poolName string) (infra.Machine, error)
+	Create(poolName string, desiredInstances int) (infra.Machines, error)
+	DesiredMachines(poolName string, instances int) int
 }
 
 func Each(svc MachinesService, do func(pool string, machine infra.Machine) error) error {
@@ -24,12 +25,12 @@ func Each(svc MachinesService, do func(pool string, machine infra.Machine) error
 	for _, pool := range pools {
 		machines, listErr := svc.List(pool)
 		err = helpers.Concat(err, listErr)
-		for _, machine := range machines {
+		for idx := range machines {
 			wg.Add(1)
 			go func(p string, m infra.Machine) {
 				defer wg.Done()
 				err = helpers.Concat(err, do(p, m))
-			}(pool, machine)
+			}(pool, machines[idx])
 		}
 	}
 	wg.Wait()

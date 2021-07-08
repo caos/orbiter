@@ -3,6 +3,8 @@ package static
 import (
 	"strings"
 
+	"github.com/caos/orbos/internal/operator/orbiter/kinds/loadbalancers"
+
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers/core"
 
 	"github.com/caos/orbos/pkg/tree"
@@ -65,16 +67,15 @@ func (c *machine) IP() string {
 	return c.X_IP
 }
 
-func (c *machine) Remove() error {
-	if err := c.Machine.WriteFile(c.poolFile, strings.NewReader(""), 600); err != nil {
-		return err
-	}
+func (c *machine) Destroy() (func() error, error) {
+	c.Execute(nil, "sudo systemctl stop node-agentd keepalived nginx")
+	c.Execute(nil, "sudo systemctl disable node-agentd keepalived nginx")
 	c.X_active = false
-	c.Execute(nil, "sudo systemctl stop node-agentd")
-	c.Execute(nil, "sudo systemctl disable node-agentd")
-	c.Execute(nil, "sudo kubeadm reset -f")
-	c.Execute(nil, "sudo rm -rf /var/lib/etcd")
-	return nil
+	return func() error {
+		c.Execute(nil, "sudo kubeadm reset -f")
+		c.Execute(nil, "sudo rm -rf /var/lib/etcd")
+		return nil
+	}, c.Machine.WriteFile(c.poolFile, strings.NewReader(""), 600)
 }
 
 func (c *machine) RebootRequired() (bool, func(), func()) {
@@ -91,6 +92,11 @@ func ListMachines(monitor mntr.Monitor, desiredTree *tree.Tree, providerID strin
 		return nil, errors.Wrap(err, "parsing desired state failed")
 	}
 	desiredTree.Parsed = desired
+
+	_, _, _, _, _, err = loadbalancers.GetQueryAndDestroyFunc(monitor, nil, desired.Loadbalancing, &tree.Tree{}, nil)
+	if err != nil {
+		return nil, err
+	}
 
 	machinesSvc := NewMachinesService(monitor,
 		desired,

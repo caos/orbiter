@@ -2,9 +2,9 @@ package static
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 
-	"github.com/caos/orbos/internal/operator/orbiter"
 	secret2 "github.com/caos/orbos/pkg/secret"
 	"github.com/caos/orbos/pkg/tree"
 	"github.com/pkg/errors"
@@ -21,6 +21,7 @@ type Spec struct {
 	Pools              map[string][]*Machine
 	Keys               *Keys
 	ExternalInterfaces []string
+	PrivateInterface   string
 }
 
 type Keys struct {
@@ -76,7 +77,7 @@ func parseDesiredV0(desiredTree *tree.Tree) (*DesiredV0, error) {
 type Machine struct {
 	ID                  string
 	Hostname            string
-	IP                  orbiter.IPAddress
+	IP                  string
 	RebootRequired      bool
 	ReplacementRequired bool
 }
@@ -100,5 +101,8 @@ func (c *Machine) validate() error {
 		return fmt.Errorf("validating hostname failed: %w", err)
 	}
 
-	return c.IP.Validate()
+	if net.ParseIP(c.IP) == nil {
+		return fmt.Errorf("%s is not a valid ip address", c.IP)
+	}
+	return nil
 }

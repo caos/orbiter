@@ -1,17 +1,15 @@
 package main
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 
-	"github.com/caos/orbos/pkg/kubernetes/cli"
+	"github.com/spf13/cobra"
 
 	"github.com/caos/orbos/internal/secret/operators"
-
+	"github.com/caos/orbos/pkg/kubernetes/cli"
 	"github.com/caos/orbos/pkg/secret"
-
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 )
 
 func WriteSecretCommand(getRv GetRootValues) *cobra.Command {
@@ -40,7 +38,7 @@ orbctl writesecret mygceprovider.google_application_credentials_value.encrypted 
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
 
-		s, err := key(value, file, stdin)
+		s, err := content(value, file, stdin)
 		if err != nil {
 			return err
 		}
@@ -81,7 +79,7 @@ orbctl writesecret mygceprovider.google_application_credentials_value.encrypted 
 	return cmd
 }
 
-func key(value string, file string, stdin bool) (string, error) {
+func content(value string, file string, stdin bool) (string, error) {
 
 	channels := 0
 	if value != "" {
@@ -95,7 +93,7 @@ func key(value string, file string, stdin bool) (string, error) {
 	}
 
 	if channels != 1 {
-		return "", errors.New("Key must be provided eighter by value or by file path or by standard input")
+		return "", errors.New("content must be provided eighter by value or by file path or by standard input")
 	}
 
 	if value != "" {
@@ -111,9 +109,9 @@ func key(value string, file string, stdin bool) (string, error) {
 		}
 	}
 
-	key, err := readFunc()
+	c, err := readFunc()
 	if err != nil {
 		panic(err)
 	}
-	return string(key), err
+	return string(c), err
 }

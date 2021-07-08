@@ -219,7 +219,7 @@ func (c *GitCrd) WriteBackCurrentState(currentResourceList []*clientgo.Resource)
 		Content: content,
 	}
 
-	c.status = c.git.UpdateRemote("current state changed", file)
+	c.status = c.git.UpdateRemote("current state changed", func() []git.File { return []git.File{file} })
 }
 
 func (c *GitCrd) applyFolder(monitor mntr.Monitor, apply *toolsetslatest.Apply, force bool) error {

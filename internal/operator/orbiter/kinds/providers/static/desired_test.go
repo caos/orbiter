@@ -2,15 +2,13 @@ package static
 
 import (
 	"testing"
-
-	"github.com/caos/orbos/internal/operator/orbiter"
 )
 
 func TestMachine_validate(t *testing.T) {
 	type fields struct {
 		ID                  string
 		Hostname            string
-		IP                  orbiter.IPAddress
+		IP                  string
 		RebootRequired      bool
 		ReplacementRequired bool
 	}

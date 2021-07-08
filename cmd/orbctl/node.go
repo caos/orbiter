@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	orbcfg "github.com/caos/orbos/pkg/orb"
 
@@ -27,7 +28,9 @@ func NodeCommand() *cobra.Command {
 func requireMachines(monitor mntr.Monitor, gitClient *git.Client, orbConfig *orbcfg.Orb, args []string, method func(machine infra.Machine) (required bool, require func(), unrequire func())) error {
 	return machines(monitor, gitClient, orbConfig, func(machineIDs []string, machines map[string]infra.Machine, desired *tree.Tree) error {
 
+		var selected bool
 		if len(args) <= 0 {
+			selected = true
 			if err := survey.AskOne(&survey.MultiSelect{
 				Message: "Select machines:",
 				Options: machineIDs,
@@ -40,7 +43,16 @@ func requireMachines(monitor mntr.Monitor, gitClient *git.Client, orbConfig *orb
 		for _, arg := range args {
 			machine, found := machines[arg]
 			if !found {
-				panic(fmt.Sprintf("Machine with ID %s unknown", arg))
+
+				if selected {
+					panic(fmt.Errorf("selected machine %s not found", arg))
+				}
+
+				if strings.Count(arg, ".") != 2 {
+					return helpErr{fmt.Errorf("machine id must have the format <provider>.<pool>.<machine>")}
+				}
+
+				return fmt.Errorf("machine %s not found", arg)
 			}
 
 			required, require, _ := method(machine)

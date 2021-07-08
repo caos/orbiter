@@ -19,7 +19,13 @@ func destroy(providerCurrents map[string]interface{}, k8sClient *kubernetes.Clie
 				return err
 			}
 			for _, machine := range machines {
-				machine.Remove()
+				remove, err := machine.Destroy()
+				if err != nil {
+					return err
+				}
+				if err := remove(); err != nil {
+					return err
+				}
 			}
 		}
 	}

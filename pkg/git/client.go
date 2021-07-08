@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-git/go-git/v5/plumbing"
+
 	"github.com/caos/orbos/internal/operator/common"
 
 	"github.com/caos/orbos/pkg/tree"
@@ -21,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/caos/orbos/mntr"
-	billy "github.com/go-git/go-billy/v5"
+	"github.com/go-git/go-billy/v5"
 	"github.com/go-git/go-billy/v5/memfs"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -319,7 +321,7 @@ type File struct {
 	Content []byte
 }
 
-func (g *Client) StageAndCommit(msg string, files ...File) (bool, error) {
+func (g *Client) stageAndCommit(msg string, files ...File) (bool, error) {
 	if g.stage(files...) {
 		return false, nil
 	}
@@ -327,12 +329,13 @@ func (g *Client) StageAndCommit(msg string, files ...File) (bool, error) {
 	return true, g.Commit(msg)
 }
 
-func (g *Client) UpdateRemote(msg string, files ...File) error {
+func (g *Client) UpdateRemote(msg string, whenCloned func() []File) error {
+
 	if err := g.Clone(); err != nil {
 		return errors.Wrap(err, "recloning before committing changes failed")
 	}
 
-	changed, err := g.StageAndCommit(msg, files...)
+	changed, err := g.stageAndCommit(msg, whenCloned()...)
 	if err != nil {
 		return err
 	}
@@ -341,8 +344,14 @@ func (g *Client) UpdateRemote(msg string, files ...File) error {
 		g.monitor.Info("No changes")
 		return nil
 	}
-
-	return g.Push()
+	err = g.Push()
+	if err != nil &&
+		(errors.Is(err, plumbing.ErrObjectNotFound) ||
+			strings.Contains(err.Error(), "cannot lock ref")) {
+		g.monitor.WithField("response", err.Error()).Info("Git collision detected, retrying")
+		return g.UpdateRemote(msg, whenCloned)
+	}
+	return err
 }
 
 func (g *Client) stage(files ...File) bool {
@@ -433,16 +442,17 @@ type GitDesiredState struct {
 
 func (g *Client) PushGitDesiredStates(monitor mntr.Monitor, msg string, desireds []GitDesiredState) (err error) {
 	monitor.OnChange = func(_ string, fields map[string]string) {
-		gitFiles := make([]File, len(desireds))
-		for i := range desireds {
-			desired := desireds[i]
-			gitFiles[i] = File{
-				Path:    string(desired.Path),
-				Content: common.MarshalYAML(desired.Desired),
+		err = g.UpdateRemote(mntr.SprintCommit(msg, fields), func() []File {
+			gitFiles := make([]File, len(desireds))
+			for i := range desireds {
+				desired := desireds[i]
+				gitFiles[i] = File{
+					Path:    string(desired.Path),
+					Content: common.MarshalYAML(desired.Desired),
+				}
 			}
-		}
-		err = g.UpdateRemote(mntr.SprintCommit(msg, fields), gitFiles...)
-		//		mntr.LogMessage(msg, fields)
+			return gitFiles
+		})
 	}
 	monitor.Changed(msg)
 	return err

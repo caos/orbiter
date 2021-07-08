@@ -16,10 +16,10 @@ func machine(machine infra.Machine, desire func() error) infra.Machine {
 	}
 }
 
-func (c *cmpLB) Remove() error {
-	err := c.Machine.Remove()
+func (c *cmpLB) Destroy() (func() error, error) {
+	remove, err := c.Machine.Destroy()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return c.desire()
+	return remove, c.desire()
 }

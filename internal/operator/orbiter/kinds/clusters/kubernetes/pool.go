@@ -7,7 +7,7 @@ import (
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/clusters/core/infra"
 )
 
-func newMachines(pool infra.Pool, number int) (machines []infra.Machine, err error) {
+func newMachines(pool infra.Pool, number int, desiredInstances int) (machines []infra.Machine, err error) {
 
 	var wg sync.WaitGroup
 	var it int
@@ -15,12 +15,14 @@ func newMachines(pool infra.Pool, number int) (machines []infra.Machine, err err
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			machine, addErr := pool.AddMachine()
+			infraMachines, addErr := pool.AddMachine(desiredInstances)
 			if addErr != nil {
 				err = helpers.Concat(err, addErr)
 				return
 			}
-			machines = append(machines, machine)
+			for _, machine := range infraMachines {
+				machines = append(machines, machine)
+			}
 		}()
 	}
 
@@ -31,7 +33,14 @@ func newMachines(pool infra.Pool, number int) (machines []infra.Machine, err err
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = helpers.Concat(err, machine.Remove())
+
+				remove, destroyErr := machine.Destroy()
+				err = helpers.Concat(err, destroyErr)
+				if destroyErr != nil {
+					return
+				}
+
+				err = helpers.Concat(err, remove())
 			}()
 		}
 		wg.Wait()

@@ -8,7 +8,11 @@ import (
 func destroy(svc *machinesService, desired *DesiredV0, current *Current) error {
 
 	core.Each(svc, func(pool string, machine infra.Machine) error {
-		return machine.Remove()
+		remove, err := machine.Destroy()
+		if err != nil {
+			return err
+		}
+		return remove()
 	})
 
 	return addPools(current, desired, svc)

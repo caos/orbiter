@@ -31,18 +31,21 @@ func Destroy(monitor mntr.Monitor, gitClient *git.Client, adapt AdaptFunc, finis
 	}
 
 	monitor.OnChange = func(evt string, fields map[string]string) {
-		if err := gitClient.UpdateRemote(mntr.CommitRecord([]*mntr.Field{{Key: "evt", Value: evt}}), git.File{
-			Path:    "caos-internal/orbiter/current.yml",
-			Content: []byte(""),
-		}, git.File{
-			Path:    "caos-internal/orbiter/node-agents-current.yml",
-			Content: []byte(""),
-		}, git.File{
-			Path:    "caos-internal/orbiter/node-agents-desired.yml",
-			Content: []byte(""),
-		}, git.File{
-			Path:    "orbiter.yml",
-			Content: common.MarshalYAML(treeDesired),
+		if err := gitClient.UpdateRemote(mntr.CommitRecord([]*mntr.Field{{Key: "evt", Value: evt}}), func() []git.File {
+			return []git.File{
+				{
+					Path:    "caos-internal/orbiter/current.yml",
+					Content: []byte(""),
+				}, {
+					Path:    "caos-internal/orbiter/node-agents-current.yml",
+					Content: []byte(""),
+				}, {
+					Path:    "caos-internal/orbiter/node-agents-desired.yml",
+					Content: []byte(""),
+				}, {
+					Path:    "orbiter.yml",
+					Content: common.MarshalYAML(treeDesired),
+				}}
 		}); err != nil {
 			panic(err)
 		}

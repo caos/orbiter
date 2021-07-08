@@ -70,11 +70,13 @@ func ConfigureOperators(
 	return secret.Rewrite(
 		rewriteKey,
 		func() error {
-			gitFiles := make([]git.File, len(marshallers))
-			for i := range marshallers {
-				gitFiles[i] = marshallers[i]()
-			}
-			return gitClient.UpdateRemote("Reconfigured operators", gitFiles...)
+			return gitClient.UpdateRemote("Reconfigured operators", func() []git.File {
+				gitFiles := make([]git.File, len(marshallers))
+				for i := range marshallers {
+					gitFiles[i] = marshallers[i]()
+				}
+				return gitFiles
+			})
 		},
 	)
 }

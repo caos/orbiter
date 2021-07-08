@@ -3,11 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/caos/orbos/pkg/kubernetes/cli"
-
-	"github.com/caos/orbos/pkg/secret"
-
 	"github.com/caos/orbos/internal/secret/operators"
+	"github.com/caos/orbos/pkg/kubernetes/cli"
+	"github.com/caos/orbos/pkg/secret"
 
 	"github.com/spf13/cobra"
 )

@@ -2,8 +2,11 @@ package gce
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/caos/orbos/mntr"
 
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/providers/ssh"
 	"github.com/pkg/errors"
@@ -18,12 +21,18 @@ import (
 
 var _ core.MachinesService = (*machinesService)(nil)
 
+type creatingInstance struct {
+	zone string
+	id   string
+}
+
 type machinesService struct {
 	context *context
 	oneoff  bool
 	key     *SSHKey
 	cache   struct {
-		instances map[string][]*instance
+		instances         map[string][]*instance
+		creatingInstances map[string][]*creatingInstance
 		sync.Mutex
 	}
 	onCreate func(pool string, machine infra.Machine) error
@@ -34,6 +43,18 @@ func newMachinesService(context *context, oneoff bool) *machinesService {
 		context: context,
 		oneoff:  oneoff,
 	}
+}
+
+func (m *machinesService) DesiredMachines(poolName string, instances int) int {
+	desired, ok := m.context.desired.Pools[poolName]
+	if !ok {
+		return 0
+	}
+
+	if desired.Multizonal != nil && len(desired.Multizonal) > 0 {
+		return (len(desired.Multizonal) * instances)
+	}
+	return instances
 }
 
 func (m *machinesService) use(key *SSHKey) error {
@@ -55,7 +76,7 @@ func (m *machinesService) restartPreemptibleMachines() error {
 			if instance.start {
 				if err := operateFunc(
 					func() { instance.Monitor.Debug("Restarting preemptible instance") },
-					computeOpCall(m.context.client.Instances.Start(m.context.projectID, m.context.desired.Zone, instance.ID()).RequestId(uuid.NewV1().String()).Do),
+					computeOpCall(m.context.client.Instances.Start(m.context.projectID, instance.zone, instance.ID()).RequestId(uuid.NewV1().String()).Do),
 					func() error { instance.Monitor.Info("Preemptible instance restarted"); return nil },
 				)(); err != nil {
 					return err
@@ -66,12 +87,23 @@ func (m *machinesService) restartPreemptibleMachines() error {
 	return nil
 }
 
-func (m *machinesService) Create(poolName string) (infra.Machine, error) {
+func getDesiredZones(defaultZone string, multizonal []string) []string {
+	zones := make([]string, 0)
+	if multizonal != nil && len(multizonal) > 0 {
+		zones = multizonal
+	} else {
+		zones = append(zones, defaultZone)
+	}
+	return zones
+}
 
+func (m *machinesService) Create(poolName string, desiredInstances int) (infra.Machines, error) {
 	desired, ok := m.context.desired.Pools[poolName]
 	if !ok {
 		return nil, fmt.Errorf("Pool %s is not configured", poolName)
 	}
+	usableZone := m.context.desired.Zone
+	zones := getDesiredZones(m.context.desired.Zone, desired.Multizonal)
 
 	// Calculate minimum cpu and memory according to the gce specs:
 	// https://cloud.google.com/machine/docs/instances/creating-instance-with-custom-machine-type#specifications
@@ -95,6 +127,98 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 		memoryPerCore = float64(memory) / float64(cores)
 	}
 
+	infraMachines := make([]infra.Machine, 0)
+	currentInfraMachines := make([]infra.Machine, 0)
+	if len(zones) > 1 {
+		currentInfraMachinesT, err := m.List(poolName)
+		if err != nil {
+			return nil, err
+		}
+		currentInfraMachines = currentInfraMachinesT
+		usableZone = ""
+		for zoneI := range zones {
+			zone := zones[zoneI]
+			zoneCovered := 0
+			for _, currentInfraMachine := range currentInfraMachines {
+				currentGCEMachine, ok := currentInfraMachine.(machine)
+				replaceRequired := false
+				for _, replaceRequiredID := range m.context.desired.ReplacementRequired {
+					if currentInfraMachine.ID() == replaceRequiredID {
+						replaceRequired = true
+					}
+				}
+				if ok && zone == currentGCEMachine.Zone() && !replaceRequired {
+					zoneCovered++
+				}
+			}
+			for _, currentCreating := range m.cache.creatingInstances[poolName] {
+				if currentCreating.zone == zone {
+					zoneCovered++
+				}
+			}
+			if zoneCovered >= desiredInstances {
+				continue
+			}
+			// find first usable zone to add machine to then leave loop
+			usableZone = zone
+			break
+		}
+
+		if usableZone == "" {
+			return nil, errors.New("error while creating all zones already covered")
+		}
+	}
+
+	name := newName()
+	if m.cache.creatingInstances == nil {
+		m.cache.creatingInstances = map[string][]*creatingInstance{}
+	}
+	if m.cache.creatingInstances[poolName] == nil {
+		m.cache.creatingInstances[poolName] = make([]*creatingInstance, 0)
+	}
+	m.cache.creatingInstances[poolName] = append(m.cache.creatingInstances[poolName], &creatingInstance{
+		zone: usableZone,
+		id:   name,
+	})
+
+	monitor := m.context.monitor.WithFields(map[string]interface{}{
+		"machine": name,
+		"pool":    poolName,
+	})
+	infraMachine, err := m.getCreatableMachine(
+		monitor,
+		poolName,
+		desired,
+		name,
+		usableZone,
+		cores,
+		memory,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if m.cache.instances != nil {
+		if _, ok := m.cache.instances[poolName]; !ok {
+			m.cache.instances[poolName] = make([]*instance, 0)
+		}
+		m.cache.instances[poolName] = append(m.cache.instances[poolName], infraMachine)
+	}
+
+	if err := m.onCreate(poolName, infraMachine); err != nil {
+		return nil, err
+	}
+	monitor.Info("Machine created")
+	infraMachines = append(infraMachines, infraMachine)
+	for i, instance := range m.cache.creatingInstances[poolName] {
+		if instance.id == infraMachine.ID() {
+			m.cache.creatingInstances[poolName] = append(m.cache.creatingInstances[poolName][:i], m.cache.creatingInstances[poolName][i+1:]...)
+		}
+	}
+	return infraMachines, nil
+}
+
+func (m *machinesService) getCreatableMachine(monitor mntr.Monitor, poolName string, desired *Pool, name string, zone string, cores int, memory float64) (*instance, error) {
 	disks := []*compute.AttachedDisk{{
 		Type:       "PERSISTENT",
 		AutoDelete: true,
@@ -102,7 +226,7 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 		InitializeParams: &compute.AttachedDiskInitializeParams{
 			DiskSizeGb:  int64(desired.StorageGB),
 			SourceImage: desired.OSImage,
-			DiskType:    fmt.Sprintf("zones/%s/diskTypes/%s", m.context.desired.Zone, desired.StorageDiskType),
+			DiskType:    fmt.Sprintf("zones/%s/diskTypes/%s", zone, desired.StorageDiskType),
 		}},
 	}
 
@@ -115,19 +239,18 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 			Boot:       false,
 			Interface:  "NVME",
 			InitializeParams: &compute.AttachedDiskInitializeParams{
-				DiskType: fmt.Sprintf("zones/%s/diskTypes/local-ssd", m.context.desired.Zone),
+				DiskType: fmt.Sprintf("zones/%s/diskTypes/local-ssd", zone),
 			},
 			DeviceName: name,
 		})
 		diskNames[i] = name
 	}
 
-	name := newName()
 	nwTags := networkTags(m.context.orbID, m.context.providerID, poolName)
 	sshKey := fmt.Sprintf("orbiter:%s", m.key.Public.Value)
 	createInstance := &compute.Instance{
 		Name:        name,
-		MachineType: fmt.Sprintf("zones/%s/machineTypes/custom-%d-%d", m.context.desired.Zone, cores, int(memory)),
+		MachineType: fmt.Sprintf("zones/%s/machineTypes/custom-%d-%d", zone, cores, int(memory)),
 		Tags:        &compute.Tags{Items: nwTags},
 		NetworkInterfaces: []*compute.NetworkInterface{{
 			Network: m.context.networkURL,
@@ -146,20 +269,15 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 		}},
 	}
 
-	monitor := m.context.monitor.WithFields(map[string]interface{}{
-		"machine": name,
-		"pool":    poolName,
-	})
-
 	if err := operateFunc(
 		func() { monitor.Debug("Creating instance") },
-		computeOpCall(m.context.client.Instances.Insert(m.context.projectID, m.context.desired.Zone, createInstance).RequestId(uuid.NewV1().String()).Do),
+		computeOpCall(m.context.client.Instances.Insert(m.context.projectID, zone, createInstance).RequestId(uuid.NewV1().String()).Do),
 		func() error { monitor.Info("Instance created"); return nil },
 	)(); err != nil {
 		return nil, err
 	}
 
-	newInstance, err := m.context.client.Instances.Get(m.context.projectID, m.context.desired.Zone, createInstance.Name).
+	newInstance, err := m.context.client.Instances.Get(m.context.projectID, zone, createInstance.Name).
 		Fields("selfLink,networkInterfaces(networkIP)").
 		Do()
 	if err != nil {
@@ -168,7 +286,7 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 
 	var machine machine
 	if m.oneoff {
-		machine = newGCEMachine(m.context, monitor, createInstance.Name)
+		machine = newGCEMachine(m.context, monitor, createInstance.Name, zone)
 	} else {
 		sshMachine := ssh.NewMachine(monitor, "orbiter", newInstance.NetworkInterfaces[0].NetworkIP)
 		if err := sshMachine.UseKey([]byte(m.key.Private.Value)); err != nil {
@@ -184,9 +302,11 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 		newInstance.NetworkInterfaces[0].NetworkIP,
 		newInstance.SelfLink,
 		poolName,
+		zone,
 		m.removeMachineFunc(
 			poolName,
 			createInstance.Name,
+			zone,
 		),
 		false,
 		machine,
@@ -206,26 +326,18 @@ func (m *machinesService) Create(poolName string) (infra.Machine, error) {
 			)
 			return formatErr
 		}); err != nil {
-			if cleanupErr := infraMachine.Remove(); cleanupErr != nil {
+			remove, cleanupErr := infraMachine.Destroy()
+			if cleanupErr != nil {
 				panic(cleanupErr)
+			}
+			if rmErr := remove(); rmErr != nil {
+				panic(rmErr)
 			}
 			return nil, err
 		}
 		monitor.WithField("mountpoint", mountPoint).Info("Disk formatted")
 	}
 
-	if m.cache.instances != nil {
-		if _, ok := m.cache.instances[poolName]; !ok {
-			m.cache.instances[poolName] = make([]*instance, 0)
-		}
-		m.cache.instances[poolName] = append(m.cache.instances[poolName], infraMachine)
-	}
-
-	if err := m.onCreate(poolName, infraMachine); err != nil {
-		return nil, err
-	}
-
-	monitor.Info("Machine created")
 	return infraMachine, nil
 }
 
@@ -266,89 +378,101 @@ func getAllInstances(m *machinesService) (map[string][]*instance, error) {
 		m.cache.instances = make(map[string][]*instance)
 	}
 
-	instances, err := m.context.client.Instances.
-		List(m.context.projectID, m.context.desired.Zone).
-		Filter(fmt.Sprintf(`labels.orb=%s AND labels.provider=%s`, m.context.orbID, m.context.providerID)).
-		Fields("items(name,labels,selfLink,status,scheduling(preemptible),networkInterfaces(networkIP))").
-		Do()
+	region, err := m.context.client.Regions.Get(m.context.projectID, m.context.desired.Region).Do()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, inst := range instances.Items {
+	for zoneURLI := range region.Zones {
+		zoneURL := region.Zones[zoneURLI]
+		zoneURLParts := strings.Split(zoneURL, "/")
+		zone := zoneURLParts[(len(zoneURLParts) - 1)]
 
-		if inst.Labels["orb"] != m.context.orbID || inst.Labels["provider"] != m.context.providerID {
-			continue
+		instances, err := m.context.client.Instances.
+			List(m.context.projectID, zone).
+			Filter(fmt.Sprintf(`labels.orb=%s AND labels.provider=%s`, m.context.orbID, m.context.providerID)).
+			Fields("items(name,labels,selfLink,status,scheduling(preemptible),networkInterfaces(networkIP))").
+			Do()
+		if err != nil {
+			return nil, err
 		}
 
-		pool := inst.Labels["pool"]
+		for _, inst := range instances.Items {
 
-		var machine machine
-		if m.oneoff {
-			machine = newGCEMachine(m.context, m.context.monitor.WithFields(toFields(inst.Labels)), inst.Name)
-		} else {
-			sshMachine := ssh.NewMachine(m.context.monitor.WithFields(toFields(inst.Labels)), "orbiter", inst.NetworkInterfaces[0].NetworkIP)
-			if err := sshMachine.UseKey([]byte(m.key.Private.Value)); err != nil {
-				return nil, err
+			if inst.Labels["orb"] != m.context.orbID || inst.Labels["provider"] != m.context.providerID {
+				continue
 			}
-			machine = sshMachine
-		}
 
-		rebootRequired := false
-		unrequireReboot := func() {}
-		for idx, req := range m.context.desired.RebootRequired {
-			if req == inst.Name {
-				rebootRequired = true
-				unrequireReboot = func(pos int) func() {
-					return func() {
-						copy(m.context.desired.RebootRequired[pos:], m.context.desired.RebootRequired[pos+1:])
-						m.context.desired.RebootRequired[len(m.context.desired.RebootRequired)-1] = ""
-						m.context.desired.RebootRequired = m.context.desired.RebootRequired[:len(m.context.desired.RebootRequired)-1]
-					}
-				}(idx)
-				break
+			pool := inst.Labels["pool"]
+
+			var machine machine
+			if m.oneoff {
+				machine = newGCEMachine(m.context, m.context.monitor.WithFields(toFields(inst.Labels)), inst.Name, zone)
+			} else {
+				sshMachine := ssh.NewMachine(m.context.monitor.WithFields(toFields(inst.Labels)), "orbiter", inst.NetworkInterfaces[0].NetworkIP)
+				if err := sshMachine.UseKey([]byte(m.key.Private.Value)); err != nil {
+					return nil, err
+				}
+				machine = sshMachine
 			}
-		}
 
-		replacementRequired := false
-		unrequireReplacement := func() {}
-		for idx, req := range m.context.desired.ReplacementRequired {
-			if req == inst.Name {
-				replacementRequired = true
-				unrequireReplacement = func(pos int) func() {
-					return func() {
-						copy(m.context.desired.ReplacementRequired[pos:], m.context.desired.ReplacementRequired[pos+1:])
-						m.context.desired.ReplacementRequired[len(m.context.desired.ReplacementRequired)-1] = ""
-						m.context.desired.ReplacementRequired = m.context.desired.ReplacementRequired[:len(m.context.desired.ReplacementRequired)-1]
-					}
-				}(idx)
-				break
+			rebootRequired := false
+			unrequireReboot := func() {}
+			for idx, req := range m.context.desired.RebootRequired {
+				if req == inst.Name {
+					rebootRequired = true
+					unrequireReboot = func(pos int) func() {
+						return func() {
+							copy(m.context.desired.RebootRequired[pos:], m.context.desired.RebootRequired[pos+1:])
+							m.context.desired.RebootRequired[len(m.context.desired.RebootRequired)-1] = ""
+							m.context.desired.RebootRequired = m.context.desired.RebootRequired[:len(m.context.desired.RebootRequired)-1]
+						}
+					}(idx)
+					break
+				}
 			}
+
+			replacementRequired := false
+			unrequireReplacement := func() {}
+			for idx, req := range m.context.desired.ReplacementRequired {
+				if req == inst.Name {
+					replacementRequired = true
+					unrequireReplacement = func(pos int) func() {
+						return func() {
+							copy(m.context.desired.ReplacementRequired[pos:], m.context.desired.ReplacementRequired[pos+1:])
+							m.context.desired.ReplacementRequired[len(m.context.desired.ReplacementRequired)-1] = ""
+							m.context.desired.ReplacementRequired = m.context.desired.ReplacementRequired[:len(m.context.desired.ReplacementRequired)-1]
+						}
+					}(idx)
+					break
+				}
+			}
+
+			mach := newMachine(
+				m.context,
+				m.context.monitor.WithField("name", inst.Name).WithFields(toFields(inst.Labels)),
+				inst.Name,
+				inst.NetworkInterfaces[0].NetworkIP,
+				inst.SelfLink,
+				pool,
+				zone,
+				m.removeMachineFunc(pool, inst.Name, zone),
+				inst.Status == "TERMINATED" && inst.Scheduling.Preemptible,
+				machine,
+				rebootRequired,
+				func(id string) func() {
+					return func() { m.context.desired.RebootRequired = append(m.context.desired.RebootRequired, id) }
+				}(inst.Name),
+				unrequireReboot,
+				replacementRequired,
+				func(id string) func() {
+					return func() { m.context.desired.ReplacementRequired = append(m.context.desired.ReplacementRequired, id) }
+				}(inst.Name),
+				unrequireReplacement,
+			)
+
+			m.cache.instances[pool] = append(m.cache.instances[pool], mach)
 		}
-
-		mach := newMachine(
-			m.context,
-			m.context.monitor.WithField("name", inst.Name).WithFields(toFields(inst.Labels)),
-			inst.Name,
-			inst.NetworkInterfaces[0].NetworkIP,
-			inst.SelfLink,
-			pool,
-			m.removeMachineFunc(pool, inst.Name),
-			inst.Status == "TERMINATED" && inst.Scheduling.Preemptible,
-			machine,
-			rebootRequired,
-			func(id string) func() {
-				return func() { m.context.desired.RebootRequired = append(m.context.desired.RebootRequired, id) }
-			}(inst.Name),
-			unrequireReboot,
-			replacementRequired,
-			func(id string) func() {
-				return func() { m.context.desired.ReplacementRequired = append(m.context.desired.ReplacementRequired, id) }
-			}(inst.Name),
-			unrequireReplacement,
-		)
-
-		m.cache.instances[pool] = append(m.cache.instances[pool], mach)
 	}
 
 	return m.cache.instances, nil
@@ -362,7 +486,7 @@ func toFields(labels map[string]string) map[string]interface{} {
 	return fields
 }
 
-func (m *machinesService) removeMachineFunc(pool, id string) func() error {
+func (m *machinesService) removeMachineFunc(pool, id, zone string) func() error {
 	return func() error {
 
 		m.cache.Lock()
@@ -382,7 +506,7 @@ func (m *machinesService) removeMachineFunc(pool, id string) func() error {
 			}),
 			"instance",
 			id,
-			m.context.client.Instances.Delete(m.context.projectID, m.context.desired.Zone, id).RequestId(uuid.NewV1().String()).Do,
+			m.context.client.Instances.Delete(m.context.projectID, zone, id).RequestId(uuid.NewV1().String()).Do,
 		)()
 	}
 }

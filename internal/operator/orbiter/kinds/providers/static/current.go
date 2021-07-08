@@ -14,6 +14,7 @@ type Current struct {
 		pools      map[string]infra.Pool `yaml:"-"`
 		Ingresses  map[string]*infra.Address
 		cleanupped <-chan error `yaml:"-"`
+		privateInterface string `yaml:"-"`
 	}
 }
 
@@ -25,6 +26,9 @@ func (c *Current) Ingresses() map[string]*infra.Address {
 }
 func (c *Current) Cleanupped() <-chan error {
 	return c.Current.cleanupped
+}
+func (c *Current) PrivateInterface() string {
+	return c.Current.privateInterface
 }
 
 func (c *Current) Kubernetes() infra.Kubernetes {

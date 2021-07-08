@@ -18,9 +18,11 @@ func RewriteDesiredFunc(gitClient *git.Client, desired *tree.Tree, path string) 
 
 func YML(monitor mntr.Monitor, msg string, gitClient *git.Client, desired *tree.Tree, path string) (err error) {
 	monitor.OnChange = func(_ string, fields map[string]string) {
-		err = gitClient.UpdateRemote(mntr.SprintCommit(msg, fields), git.File{
-			Path:    path,
-			Content: common.MarshalYAML(desired),
+		err = gitClient.UpdateRemote(mntr.SprintCommit(msg, fields), func() []git.File {
+			return []git.File{{
+				Path:    path,
+				Content: common.MarshalYAML(desired),
+			}}
 		})
 		mntr.LogMessage(msg, fields)
 	}

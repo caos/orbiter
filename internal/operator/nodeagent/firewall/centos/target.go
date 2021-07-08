@@ -12,7 +12,7 @@ func getEnsureTarget(monitor mntr.Monitor, zoneName string) ([]string, error) {
 	}
 
 	if target != "ACCEPT" {
-		changeTarget = []string{"--set-target=ACCEPT"}
+		changeTarget = []string{"--permanent", "--set-target=ACCEPT"}
 	}
 	return changeTarget, nil
 }

@@ -76,6 +76,48 @@ func NodeAgentFuncs(
 		})
 	}
 
+	nodeAgentPath := "/usr/local/bin/node-agent"
+	binary := nodeAgentPath
+	pprofStr := ""
+	if pprof {
+		pprofStr = "--pprof"
+	}
+	verboseStr := ""
+	if monitor.IsVerbose() {
+		verboseStr = "--verbose"
+	}
+
+	systemdEntry := "node-agentd"
+	systemdPath := fmt.Sprintf("/lib/systemd/system/%s.service", systemdEntry)
+	systemdUnitCache := make(map[string]string)
+	systemdUnitFile := func(machine infra.Machine) string {
+
+		if cached, ok := systemdUnitCache[machine.ID()]; ok {
+			return cached
+		}
+
+		newFile := fmt.Sprintf(`[Unit]
+Description=Node Agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=%s --id "%s" %s %s
+Restart=always
+MemoryLimit=250M
+MemoryAccounting=yes
+RestartSec=10
+CPUAccounting=yes
+MemoryAccounting=yes
+
+[Install]
+WantedBy=multi-user.target
+`, binary, machine.ID(), pprofStr, verboseStr)
+		systemdUnitCache[machine.ID()] = newFile
+		return newFile
+	}
+
 	return func(machine infra.Machine) error {
 			return configure(machine)()
 		}, func(currentNodeAgents *common.CurrentNodeAgents) (func(infra.Machine, string) (bool, error), func(infra.Machine) error) {
@@ -96,6 +138,18 @@ func NodeAgentFuncs(
 						"response": string(response),
 					}).Debug("Executed command")
 					if err != nil && !strings.Contains(string(response), "activating") {
+						return false, nil
+					}
+
+					remoteSystemdUnitFile := new(bytes.Buffer)
+					defer remoteSystemdUnitFile.Reset()
+					err = infra.Try(machineMonitor, time.NewTimer(7*time.Second), 2*time.Second, machine, func(cmp infra.Machine) error {
+						if err := cmp.ReadFile(systemdPath, remoteSystemdUnitFile); err != nil {
+							return fmt.Errorf("reading remote file %s on machine %s failed: %s", systemdPath, machine.ID(), err)
+						}
+						return nil
+					})
+					if remoteSystemdUnitFile.String() != systemdUnitFile(machine) {
 						return false, nil
 					}
 
@@ -125,13 +179,8 @@ func NodeAgentFuncs(
 
 					machineMonitor := monitor.WithField("machine", machine.ID())
 
-					systemdEntry := "node-agentd"
-					systemdPath := fmt.Sprintf("/lib/systemd/system/%s.service", systemdEntry)
-
-					nodeAgentPath := "/usr/local/bin/node-agent"
 					healthPath := "/usr/local/bin/health"
 
-					binary := nodeAgentPath
 					if os.Getenv("MODE") == "DEBUG" {
 						// Run node agent in debug mode
 						if _, err := machine.Execute(nil, "sudo apt-get update && sudo apt-get install -y git && wget https://dl.google.com/go/go1.13.3.linux-amd64.tar.gz && sudo tar -zxvf go1.13.3.linux-amd64.tar.gz -C / && sudo chown -R $(id -u):$(id -g) /go && /go/bin/go get -u github.com/go-delve/delve/cmd/dlv && /go/bin/go install github.com/go-delve/delve/cmd/dlv && mv ${HOME}/go/bin/dlv /usr/local/bin"); err != nil {
@@ -142,7 +191,7 @@ func NodeAgentFuncs(
 					}
 
 					stopSystemd := fmt.Sprintf("sudo systemctl stop %s orbos.health* || true", systemdEntry)
-					if err := infra.Try(machineMonitor, time.NewTimer(8*time.Second), 2*time.Second, machine, func(cmp infra.Machine) error {
+					if err := infra.Try(machineMonitor, time.NewTimer(60*time.Second), 2*time.Second, machine, func(cmp infra.Machine) error {
 						_, cbErr := cmp.Execute(nil, stopSystemd)
 						return errors.Wrapf(cbErr, "running command %s remotely failed", stopSystemd)
 					}); err != nil {
@@ -156,28 +205,7 @@ func NodeAgentFuncs(
 						configure(machine),
 						func() error {
 							if err := infra.Try(machineMonitor, time.NewTimer(8*time.Second), 2*time.Second, machine, func(cmp infra.Machine) error {
-								pprofStr := ""
-								if pprof {
-									pprofStr = "--pprof"
-								}
-								return errors.Wrapf(cmp.WriteFile(systemdPath, strings.NewReader(fmt.Sprintf(`[Unit]
-Description=Node Agent
-After=network.target
-
-[Service]
-Type=simple
-User=root
-ExecStart=%s --id "%s" %s
-Restart=always
-MemoryLimit=250M
-MemoryAccounting=yes
-RestartSec=10
-CPUAccounting=yes
-MemoryAccounting=yes
-
-[Install]
-WantedBy=multi-user.target
-`, binary, machine.ID(), pprofStr)), 600), "creating remote file %s failed", systemdPath)
+								return errors.Wrapf(cmp.WriteFile(systemdPath, strings.NewReader(systemdUnitFile(machine)), 600), "creating remote file %s failed", systemdPath)
 							}); err != nil {
 								return errors.Wrap(err, "remotely configuring Node Agent systemd unit failed")
 							}

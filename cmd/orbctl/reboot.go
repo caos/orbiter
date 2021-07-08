@@ -10,9 +10,8 @@ import (
 
 func RebootCommand(getRv GetRootValues) *cobra.Command {
 	return &cobra.Command{
-		Use:   "reboot",
+		Use:   "reboot [<provider>.<pool>.<machine>] [<provider>.<pool>.<machine>]",
 		Short: "Gracefully reboot machines",
-		Long:  "Pass machine ids as arguments, omit arguments for selecting machines interactively",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 			rv, err := getRv()

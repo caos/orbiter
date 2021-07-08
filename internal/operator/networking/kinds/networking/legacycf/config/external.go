@@ -3,20 +3,19 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net"
 
 	"github.com/caos/orbos/pkg/secret"
 
 	core2 "github.com/caos/orbos/internal/operator/core"
 	"github.com/caos/orbos/internal/operator/networking/kinds/networking/core"
 	"github.com/caos/orbos/pkg/labels"
-
-	"github.com/caos/orbos/internal/operator/orbiter"
 )
 
 type ExternalConfig struct {
 	Verbose       bool
 	Domain        string
-	IP            orbiter.IPAddress
+	IP            string
 	Rules         []*Rule
 	Groups        []*Group     `yaml:"groups"`
 	Credentials   *Credentials `yaml:"credentials"`
@@ -58,7 +57,10 @@ func (e *ExternalConfig) Validate() error {
 	if e.Domain == "" {
 		return errors.New("no domain configured")
 	}
-	return e.IP.Validate()
+	if net.ParseIP(e.IP) == nil {
+		return fmt.Errorf("%s is not a valid ip address", e.IP)
+	}
+	return nil
 }
 
 func (e *ExternalConfig) ValidateSecrets() error {
@@ -106,10 +108,10 @@ func (e *ExternalConfig) internalDomain() (*InternalDomain, *current) {
 		}
 }
 
-func subdomain(subdomain string, ip orbiter.IPAddress) *Subdomain {
+func subdomain(subdomain string, ip string) *Subdomain {
 	return &Subdomain{
 		Subdomain: subdomain,
-		IP:        string(ip),
+		IP:        ip,
 		Proxied:   true,
 		TTL:       0,
 		Type:      "A",

@@ -65,10 +65,10 @@ func ListCommand(getRv GetRootValues) *cobra.Command {
 				if context == "" || context == ctx {
 					v := reflect.ValueOf(mach).Elem()
 					if !tail {
-						headers = tableprinter.StructParser.ParseHeaders(v)
+						headers = append([]string{"context"}, tableprinter.StructParser.ParseHeaders(v)...)
 						if column != "" {
 							for idx, h := range headers {
-								if strings.Contains(h, column) {
+								if strings.Contains(strings.ToLower(h), strings.ToLower(column)) {
 									cellIdx = idx
 								}
 							}
@@ -76,17 +76,17 @@ func ListCommand(getRv GetRootValues) *cobra.Command {
 								return fmt.Errorf("unknown column: %s", column)
 							}
 						}
-						headers = append([]string{"context"}, headers...)
 						tail = true
 					}
 
 					cells, _ := tableprinter.StructParser.ParseRow(v)
+					cells = append([]string{ctx}, cells...)
 
 					if cellIdx > -1 {
 						fmt.Println(cells[cellIdx])
 						continue
 					}
-					rows = append(rows, append([]string{ctx}, cells...))
+					rows = append(rows, cells)
 				}
 			}
 

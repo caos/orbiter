@@ -3678,6 +3678,9 @@ spec:
             # Auto-detect the BGP IP address.
             - name: IP
               value: "autodetect"
+            # inspired by https://github.com/projectcalico/calico/issues/2561#issuecomment-531537534
+            - name: IP_AUTODETECTION_METHOD
+              value: "interface={{.PrivateInterface}}"
             # Enable IPIP
             - name: CALICO_IPV4POOL_IPIP
               value: "Always"

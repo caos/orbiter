@@ -44,6 +44,11 @@ func AdaptFunc(
 			migrate = true
 		}
 
+		if desiredKind.Spec.PrivateInterface == "" {
+			desiredKind.Spec.PrivateInterface = "eth0"
+			migrate = true
+		}
+
 		if err := desiredKind.validateAdapt(); err != nil {
 			return nil, nil, nil, migrate, nil, err
 		}
@@ -66,6 +71,7 @@ func AdaptFunc(
 				Version: "v0",
 			},
 		}
+		current.Current.privateInterface = desiredKind.Spec.PrivateInterface
 		currentTree.Parsed = current
 
 		svc := NewMachinesService(monitor, desiredKind, id)

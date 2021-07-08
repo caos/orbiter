@@ -1023,7 +1023,7 @@ func (c *Client) RemoveFromTaints(taints []core.Taint, reason DrainReason) (resu
 	return append(taints[0:idx], taints[idx+1:]...)
 }
 
-func (c *Client) Drain(machine Machine, node *core.Node, reason DrainReason) (err error) {
+func (c *Client) Drain(machine Machine, node *core.Node, reason DrainReason, self bool) (err error) {
 	defer func() {
 		err = errors.Wrapf(err, "draining node %s failed", node.GetName())
 	}()
@@ -1037,7 +1037,7 @@ func (c *Client) Drain(machine Machine, node *core.Node, reason DrainReason) (er
 		return err
 	}
 
-	if err := c.evictPods(node); err != nil {
+	if err := c.evictPods(node, self); err != nil {
 		return err
 	}
 	if !machine.GetUpdating() {
@@ -1055,7 +1055,7 @@ func (c *Client) DeleteNode(name string) error {
 	return err
 }
 
-func (c *Client) evictPods(node *core.Node) (err error) {
+func (c *Client) evictPods(node *core.Node, self bool) (err error) {
 
 	defer func() {
 		err = errors.Wrapf(err, "evicting pods from node %s failed", node.GetName())
@@ -1067,12 +1067,17 @@ func (c *Client) evictPods(node *core.Node) (err error) {
 
 	monitor.Info("Evicting pods")
 
-	selector := fmt.Sprintf("spec.nodeName=%s,status.phase=Running", node.Name)
+	fieldSelector := fmt.Sprintf("spec.nodeName=%s,status.phase=Running", node.Name) // possibly selects self too
+	var labelSelector string
+	if !self {
+		labelSelector = "app.kubernetes.io/name!=orbiter" // exclude self
+	}
 	podItems, err := c.set.CoreV1().Pods("").List(context.Background(), mach.ListOptions{
-		FieldSelector: selector,
+		FieldSelector: fieldSelector,
+		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		return errors.Wrapf(err, "listing pods with selector %s failed", selector)
+		return errors.Wrapf(err, "listing pods with field-selector %s and label-selector %s failed", fieldSelector, labelSelector)
 	}
 
 	// --ignore-daemonsets

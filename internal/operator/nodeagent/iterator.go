@@ -92,24 +92,10 @@ func Iterator(
 
 		curr := &common.NodeAgentCurrent{}
 
-		events := make([]*event, 0)
-		monitor.OnChange = mntr.Concat(func(evt string, fields map[string]string) {
-			clone := *curr
-			events = append(events, &event{
-				commit:  mntr.CommitRecord(mntr.AggregateCommitFields(fields)),
-				current: &clone,
-			})
-		}, monitor.OnChange)
-
 		if err := before(); err != nil {
 			panic(err)
 		}
 
-		/*query := func() (func() error, error) {
-			return doQuery(*naDesired, curr)
-		}
-
-		ensure, err := QueryFuncGoroutine(query)*/
 		ensure, err := doQuery(*naDesired, curr)
 		if err != nil {
 			monitor.Error(err)
@@ -117,9 +103,6 @@ func Iterator(
 
 		}
 		readCurrent := func() common.NodeAgentsCurrentKind {
-			if err := gitClient.Clone(); err != nil {
-				panic(err)
-			}
 			current := common.NodeAgentsCurrentKind{}
 			yaml.Unmarshal(gitClient.Read("caos-internal/orbiter/node-agents-current.yml"), &current)
 			current.Kind = "nodeagent.caos.ch/NodeAgents"
@@ -127,47 +110,21 @@ func Iterator(
 			return current
 		}
 
-		current := readCurrent()
-		current.Current.Set(id, curr)
-
 		reconciledCurrentStateMsg := "Current state reconciled"
-		reconciledCurrent, err := gitClient.StageAndCommit(mntr.CommitRecord([]*mntr.Field{{Key: "evt", Value: reconciledCurrentStateMsg}}), git.File{
-			Path:    "caos-internal/orbiter/node-agents-current.yml",
-			Content: common.MarshalYAML(current),
-		})
-		if err != nil {
-			monitor.Error(fmt.Errorf("commiting event \"%s\" failed: %s", reconciledCurrentStateMsg, err.Error()))
-			return
-		}
+		if err := gitClient.UpdateRemote(mntr.CommitRecord([]*mntr.Field{{Key: "evt", Value: reconciledCurrentStateMsg}}), func() []git.File {
 
-		if reconciledCurrent {
-			monitor.Error(gitClient.Push())
-		}
-
-		if err := ensure(); err != nil {
-			monitor.Error(err)
-			return
-		}
-
-		if events != nil && len(events) > 0 {
 			current := readCurrent()
+			current.Current.Set(id, curr)
 
-			for _, event := range events {
-				current.Current.Set(id, event.current)
-				changed, err := gitClient.StageAndCommit(event.commit, git.File{
-					Path:    "caos-internal/orbiter/node-agents-current.yml",
-					Content: common.MarshalYAML(current),
-				})
-				if err != nil {
-					monitor.Error(fmt.Errorf("commiting event \"%s\" failed: %s", event.commit, err.Error()))
-					return
-				}
-				if !changed {
-					monitor.Error(fmt.Errorf("event has no effect:", event.commit))
-					return
-				}
-			}
-			monitor.Error(gitClient.Push())
+			return []git.File{{
+				Path:    "caos-internal/orbiter/node-agents-current.yml",
+				Content: common.MarshalYAML(current),
+			}}
+		}); err != nil {
+			monitor.Error(fmt.Errorf("commiting event \"%s\" failed: %w", reconciledCurrentStateMsg, err))
+			return
 		}
+
+		monitor.Error(ensure())
 	}
 }

@@ -2,7 +2,6 @@ package orbiter
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -106,6 +105,10 @@ func Adapt(gitClient *git.Client, monitor mntr.Monitor, finished chan struct{}, 
 	return query, destroy, configure, migrate, treeDesired, treeCurrent, secrets, err
 }
 
+const clearEachEnsuredIteration uint8 = 10
+
+var clearCount uint8
+
 func Takeoff(monitor mntr.Monitor, conf *Config, healthyChan chan bool) func() {
 
 	return func() {
@@ -182,17 +185,12 @@ func Takeoff(monitor mntr.Monitor, conf *Config, healthyChan chan bool) func() {
 		}
 
 		reconciledCurrentStateMsg := "Current state reconciled"
-		currentReconciled, err := conf.GitClient.StageAndCommit(mntr.CommitRecord([]*mntr.Field{{Key: "evt", Value: reconciledCurrentStateMsg}}), marshalCurrentFiles()[0])
-		if err != nil {
-			monitor.Error(fmt.Errorf("Commiting event \"%s\" failed: %s", reconciledCurrentStateMsg, err.Error()))
-			return
-		}
 
-		if currentReconciled {
-			if err := conf.GitClient.Push(); err != nil {
-				monitor.Error(fmt.Errorf("Pushing event \"%s\" failed: %s", reconciledCurrentStateMsg, err.Error()))
-				return
-			}
+		if err := conf.GitClient.UpdateRemote(reconciledCurrentStateMsg, func() []git.File {
+			return []git.File{marshalCurrentFiles()[0]}
+		}); err != nil {
+			monitor.Error(err)
+			return
 		}
 
 		result := ensure(conf.GitClient.PushDesiredFunc(git.OrbiterFile, treeDesired))
@@ -202,27 +200,27 @@ func Takeoff(monitor mntr.Monitor, conf *Config, healthyChan chan bool) func() {
 		}
 
 		if result.Done {
+			if clearCount < clearEachEnsuredIteration {
+				clearCount++
+			}
 			monitor.Info("Desired state is ensured")
 		} else {
+			clearCount = 0
 			monitor.Info("Desired state is not yet ensured")
 		}
-		if err := conf.GitClient.Clone(); err != nil {
-			monitor.Error(fmt.Errorf("Commiting event \"%s\" failed: %s", reconciledCurrentStateMsg, err.Error()))
-			return
-		}
 
-		changed, err := conf.GitClient.StageAndCommit("Current state changed", marshalCurrentFiles()...)
-		if err != nil {
-			monitor.Error(fmt.Errorf("commiting current state failed: %w", err))
-			return
-		}
-
-		if changed {
-			pushErr := conf.GitClient.Push()
-			if err == nil {
-				err = pushErr
+		conf.GitClient.UpdateRemote("Current state changed", func() []git.File {
+			pushFiles := marshalCurrentFiles()
+			if result.Done &&
+				(len(currentNodeAgents.Current.NA) != len(desiredNodeAgents.Spec.NodeAgents.NA) || clearCount == clearEachEnsuredIteration) {
+				clearCount = 0
+				monitor.Info("Clearing node agents current states")
+				pushFiles = append(pushFiles, git.File{
+					Path:    "caos-internal/orbiter/node-agents-current.yml",
+					Content: nil,
+				})
 			}
-			monitor.Error(err)
-		}
+			return pushFiles
+		})
 	}
 }

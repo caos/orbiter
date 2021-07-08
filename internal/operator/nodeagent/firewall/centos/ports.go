@@ -2,9 +2,10 @@ package centos
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/caos/orbos/internal/operator/common"
 	"github.com/caos/orbos/mntr"
-	"strings"
 )
 
 func getAddAndRemovePorts(
@@ -96,7 +97,7 @@ func getAddAndRemovePorts(
 		}
 
 		if !found {
-			remove = append(remove, fmt.Sprintf("--remove-interface=%s", open))
+			remove = append(remove, fmt.Sprintf("--remove-port=%s", open))
 		}
 	}
 

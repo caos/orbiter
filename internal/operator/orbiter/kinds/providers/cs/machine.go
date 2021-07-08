@@ -42,9 +42,9 @@ func newMachine(server *cloudscale.Server, internalIP, externalIP string, sshMac
 	}
 }
 
-func (m *machine) ID() string    { return m.X_ID }
-func (m *machine) IP() string    { return m.X_internalIP }
-func (m *machine) Remove() error { return m.remove() }
+func (m *machine) ID() string                     { return m.X_ID }
+func (m *machine) IP() string                     { return m.X_internalIP }
+func (m *machine) Destroy() (func() error, error) { return m.remove, nil }
 
 func (m *machine) RebootRequired() (required bool, require func(), unrequire func()) {
 
@@ -76,7 +76,7 @@ func (m *machine) initAction(a *action, getSlice func() []string, setSlice func(
 		unrequire: func() {},
 		require: func() {
 			s := getSlice()
-			s = append(s, m.server.UUID)
+			s = append(s, m.server.Name)
 			setSlice(s)
 		},
 	}

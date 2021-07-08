@@ -19,6 +19,7 @@ type Machine struct {
 	monitor    mntr.Monitor
 	remoteUser string
 	ip         string
+	zone       string
 	sshCfg     *sshlib.ClientConfig
 }
 
@@ -31,6 +32,10 @@ func NewMachine(monitor mntr.Monitor, remoteUser, ip string) *Machine {
 		}),
 		ip: ip,
 	}
+}
+
+func (c *Machine) Zone() string {
+	return c.zone
 }
 
 func (c *Machine) Execute(stdin io.Reader, cmd string) (stdout []byte, err error) {

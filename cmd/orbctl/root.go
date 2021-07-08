@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"os"
 
 	"github.com/caos/orbos/internal/helpers"
 
@@ -28,15 +30,35 @@ type GetRootValues func() (*RootValues, error)
 
 type errFunc func(err error) error
 
+var _ error = (*helpErr)(nil)
+
+type helpErr struct {
+	original error
+}
+
+func (u helpErr) Error() string { return u.original.Error() }
+
+func (u *helpErr) Unwrap() error { return u.original }
+
 func RootCommand() (*cobra.Command, GetRootValues) {
 
 	ctx := context.Background()
 	rv := &RootValues{
 		Ctx: ctx,
 		ErrFunc: func(err error) error {
+			if err == nil {
+				return nil
+			}
+
 			if err != nil {
 				monitor.Error(err)
 			}
+
+			usageErr := helpErr{}
+			if errors.As(err, &usageErr) {
+				return err
+			}
+			os.Exit(1)
 			return nil
 		},
 	}
@@ -67,6 +89,7 @@ $ cat > ~/.orb/myorb << EOF
 > EOF
 $ orbctl --gitops -f ~/.orb/myorb [command]
 `,
+		SilenceErrors: true,
 	}
 
 	flags := cmd.PersistentFlags()
