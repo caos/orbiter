@@ -1,6 +1,7 @@
 package nodeagent
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -52,6 +53,7 @@ type Installer interface {
 }
 
 func prepareQuery(
+	ctx context.Context,
 	monitor mntr.Monitor,
 	commit string,
 	firewallEnsurer FirewallEnsurer,
@@ -70,7 +72,7 @@ func prepareQuery(
 
 		defer persistReadyness(curr.NodeIsReady)
 
-		dateTime, err := exec.Command("uptime", "-s").CombinedOutput()
+		dateTime, err := exec.CommandContext(ctx, "uptime", "-s").CombinedOutput()
 		if err != nil {
 			return noop, err
 		}
@@ -92,7 +94,7 @@ func prepareQuery(
 			}
 			return func() error {
 				monitor.Info("Rebooting")
-				if err := exec.Command("sudo", "reboot").Run(); err != nil {
+				if err := exec.CommandContext(ctx, "sudo", "reboot").Run(); err != nil {
 					return fmt.Errorf("rebooting system failed: %w", err)
 				}
 				return nil

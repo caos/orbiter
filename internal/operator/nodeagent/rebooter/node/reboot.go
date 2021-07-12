@@ -10,7 +10,7 @@ import (
 
 func New() nodeagent.Rebooter {
 	return rebooter.Func(func() error {
-		if err := exec.Command("reboot").Run(); err != nil {
+		if err := exec.CommandContext("reboot").Run(); err != nil {
 			return err
 		}
 		os.Exit(0)

@@ -18,7 +18,7 @@ func (p *PackageManager) rembasedAdd(repo *Repository) error {
 	outBuf := new(bytes.Buffer)
 	defer errBuf.Reset()
 
-	cmd := exec.Command("yum-config-manager", "--add-repo", repo.Repository)
+	cmd := exec.CommandContext(p.ctx, "yum-config-manager", "--add-repo", repo.Repository)
 	cmd.Stderr = errBuf
 	cmd.Stdout = outBuf
 	err := cmd.Run()
@@ -46,7 +46,7 @@ func (p *PackageManager) debbasedAdd(repo *Repository) error {
 		return errors.Wrapf(err, "getting key from url %s failed", repo.KeyURL)
 	}
 	defer resp.Body.Close()
-	cmd := exec.Command("apt-key", "add", "-")
+	cmd := exec.CommandContext("apt-key", "add", "-")
 	cmd.Stdin = resp.Body
 	cmd.Stderr = errBuf
 
@@ -67,7 +67,7 @@ func (p *PackageManager) debbasedAdd(repo *Repository) error {
 		buf := new(bytes.Buffer)
 		defer buf.Reset()
 
-		cmd := exec.Command("apt-key", "fingerprint", repo.KeyFingerprint)
+		cmd := exec.CommandContext(p.ctx, "apt-key", "fingerprint", repo.KeyFingerprint)
 		cmd.Stdout = buf
 		cmd.Stderr = errBuf
 		if err := cmd.Run(); err != nil {
@@ -106,7 +106,7 @@ func (p *PackageManager) debbasedAdd(repo *Repository) error {
 		}
 	}
 
-	cmd = exec.Command("add-apt-repository", "-y", repo.Repository)
+	cmd = exec.CommandContext(p.ctx, "add-apt-repository", "-y", repo.Repository)
 	cmd.Stderr = errBuf
 
 	if p.monitor.IsVerbose() {
@@ -122,7 +122,7 @@ func (p *PackageManager) debbasedAdd(repo *Repository) error {
 		"repository": repo.Repository,
 	}).Debug("Added repository")
 
-	cmd = exec.Command("apt-get", strings.Fields("--assume-yes --allow-downgrades update")...)
+	cmd = exec.CommandContext(p.ctx, "apt-get", strings.Fields("--assume-yes --allow-downgrades update")...)
 	cmd.Stderr = errBuf
 	if p.monitor.IsVerbose() {
 		fmt.Println(strings.Join(cmd.Args, " "))

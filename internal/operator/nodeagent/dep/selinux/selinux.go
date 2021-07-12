@@ -29,7 +29,7 @@ func Current(os dep.OperatingSystem, pkg *common.Package) (err error) {
 	buf := new(bytes.Buffer)
 	defer buf.Reset()
 
-	cmd := exec.Command("sestatus")
+	cmd := exec.CommandContext("sestatus")
 	cmd.Stdout = buf
 	if err := cmd.Run(); err != nil {
 		return err
@@ -63,7 +63,7 @@ func EnsurePermissive(monitor mntr.Monitor, opsys dep.OperatingSystem, remove co
 	errBuf := new(bytes.Buffer)
 	defer errBuf.Reset()
 
-	cmd := exec.Command("setenforce", "0")
+	cmd := exec.CommandContext("setenforce", "0")
 	cmd.Stderr = errBuf
 	if monitor.IsVerbose() {
 		fmt.Println(strings.Join(cmd.Args, " "))
@@ -74,7 +74,7 @@ func EnsurePermissive(monitor mntr.Monitor, opsys dep.OperatingSystem, remove co
 	}
 	errBuf.Reset()
 
-	cmd = exec.Command("sed", "-i", "s/^SELINUX=enforcing$/SELINUX=permissive/", "/etc/selinux/config")
+	cmd = exec.CommandContext("sed", "-i", "s/^SELINUX=enforcing$/SELINUX=permissive/", "/etc/selinux/config")
 	cmd.Stderr = errBuf
 	if monitor.IsVerbose() {
 		fmt.Println(strings.Join(cmd.Args, " "))

@@ -2,6 +2,7 @@ package keepalived
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -22,6 +23,7 @@ type Installer interface {
 	nodeagent.Installer
 }
 type keepaliveDDep struct {
+	ctx        context.Context
 	monitor    mntr.Monitor
 	manager    *dep.PackageManager
 	systemd    *dep.SystemD
@@ -30,8 +32,8 @@ type keepaliveDDep struct {
 	normalizer *regexp.Regexp
 }
 
-func New(monitor mntr.Monitor, manager *dep.PackageManager, systemd *dep.SystemD, os dep.OperatingSystem, cipher string) Installer {
-	return &keepaliveDDep{monitor, manager, systemd, cipher[:8], os, regexp.MustCompile(`\d+\.\d+\.\d+`)}
+func New(ctx context.Context, monitor mntr.Monitor, manager *dep.PackageManager, systemd *dep.SystemD, os dep.OperatingSystem, cipher string) Installer {
+	return &keepaliveDDep{ctx, monitor, manager, systemd, cipher[:8], os, regexp.MustCompile(`\d+\.\d+\.\d+`)}
 }
 
 func (keepaliveDDep) isKeepalived() {}
@@ -110,7 +112,7 @@ func (s *keepaliveDDep) Current() (pkg common.Package, err error) {
 	if string(authCheck) != "" {
 		pkg.Config["authcheck.sh"] = string(authCheck)
 		var exitCode int
-		if err := exec.Command("/etc/keepalived/authcheck.sh").Run(); err != nil {
+		if err := exec.CommandContext(s.ctx, "/etc/keepalived/authcheck.sh").Run(); err != nil {
 			exitCode = err.(*exec.ExitError).ExitCode()
 		}
 		pkg.Config["authcheckexitcode"] = strconv.Itoa(exitCode)

@@ -2,6 +2,7 @@ package conv
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -33,6 +34,7 @@ type Converter interface {
 }
 
 type dependencies struct {
+	ctx     context.Context
 	monitor mntr.Monitor
 	os      dep.OperatingSystemMajor
 	pm      *dep.PackageManager
@@ -40,14 +42,14 @@ type dependencies struct {
 	cipher  string
 }
 
-func New(monitor mntr.Monitor, os dep.OperatingSystemMajor, cipher string) Converter {
-	return &dependencies{monitor, os, nil, nil, cipher}
+func New(ctx context.Context, monitor mntr.Monitor, os dep.OperatingSystemMajor, cipher string) Converter {
+	return &dependencies{ctx, monitor, os, nil, nil, cipher}
 }
 
 func (d *dependencies) Init() func() error {
 
-	d.sysd = dep.NewSystemD(d.monitor)
-	d.pm = dep.NewPackageManager(d.monitor, d.os.OperatingSystem, d.sysd)
+	d.sysd = dep.NewSystemD(d.ctx, d.monitor)
+	d.pm = dep.NewPackageManager(d.ctx, d.monitor, d.os.OperatingSystem, d.sysd)
 
 	return func() error {
 		if err := d.pm.Init(); err != nil {
@@ -62,7 +64,7 @@ func (d *dependencies) Init() func() error {
 		}
 		errBuf := new(bytes.Buffer)
 		defer errBuf.Reset()
-		cmd := exec.Command("yum", "--assumeyes", "remove", "yum-cron")
+		cmd := exec.CommandContext(d.ctx, "yum", "--assumeyes", "remove", "yum-cron")
 		cmd.Stderr = errBuf
 		if d.monitor.IsVerbose() {
 			fmt.Println(strings.Join(cmd.Args, " "))
@@ -83,31 +85,31 @@ func (d *dependencies) ToDependencies(sw common.Software) []*nodeagent.Dependenc
 
 	dependencies := []*nodeagent.Dependency{{
 		Desired:   sw.Sysctl,
-		Installer: sysctl.New(d.monitor),
+		Installer: sysctl.New(d.ctx, d.monitor),
 	}, {
 		Desired:   sw.Health,
 		Installer: health.New(d.monitor, d.sysd),
 	}, {
 		Desired:   sw.Hostname,
-		Installer: hostname.New(),
+		Installer: hostname.New(d.ctx),
 	}, {
 		Desired:   sw.Swap,
-		Installer: swap.New("/etc/fstab"),
+		Installer: swap.New(d.ctx, "/etc/fstab"),
 	}, {
 		Desired:   sw.KeepaliveD,
-		Installer: keepalived.New(d.monitor, d.pm, d.sysd, d.os.OperatingSystem, d.cipher),
+		Installer: keepalived.New(d.ctx, d.monitor, d.pm, d.sysd, d.os.OperatingSystem, d.cipher),
 	}, {
 		Desired:   sw.SSHD,
-		Installer: sshd.New(d.sysd),
+		Installer: sshd.New(d.ctx, d.sysd),
 	}, {
 		Desired:   sw.Nginx,
 		Installer: nginx.New(d.monitor, d.pm, d.sysd, d.os.OperatingSystem),
 	}, {
 		Desired:   sw.Containerruntime,
-		Installer: cri.New(d.monitor, d.os, d.pm, d.sysd),
+		Installer: cri.New(d.ctx, d.monitor, d.os, d.pm, d.sysd),
 	}, {
 		Desired:   sw.Kubelet,
-		Installer: kubelet.New(d.monitor, d.os.OperatingSystem, d.pm, d.sysd),
+		Installer: kubelet.New(d.ctx, d.monitor, d.os.OperatingSystem, d.pm, d.sysd),
 	}, {
 		Desired:   sw.Kubectl,
 		Installer: kubectl.New(d.os.OperatingSystem, d.pm),

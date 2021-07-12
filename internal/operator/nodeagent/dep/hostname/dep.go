@@ -2,6 +2,7 @@ package hostname
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -19,10 +20,12 @@ type Installer interface {
 	nodeagent.Installer
 }
 
-type hostnameDep struct{}
+type hostnameDep struct {
+	ctx context.Context
+}
 
-func New() Installer {
-	return &hostnameDep{}
+func New(ctx context.Context) Installer {
+	return &hostnameDep{ctx: ctx}
 }
 
 func (hostnameDep) isHostname() {}
@@ -44,7 +47,7 @@ func (s *hostnameDep) Current() (pkg common.Package, err error) {
 	buf := new(bytes.Buffer)
 	defer buf.Reset()
 
-	cmd := exec.Command("hostname")
+	cmd := exec.CommandContext(s.ctx, "hostname")
 	cmd.Stdout = buf
 	if err := cmd.Run(); err != nil {
 		return pkg, err
@@ -65,7 +68,7 @@ func (s *hostnameDep) Ensure(_ common.Package, ensure common.Package) error {
 	buf := new(bytes.Buffer)
 	defer buf.Reset()
 
-	cmd := exec.Command("hostnamectl", "set-hostname", newHostname)
+	cmd := exec.CommandContext(s.ctx, "hostnamectl", "set-hostname", newHostname)
 	cmd.Stdout = buf
 	if err := cmd.Run(); err != nil {
 		return err

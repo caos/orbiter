@@ -69,7 +69,7 @@ func GetOperatingSystem() (OperatingSystemMajor, error) {
 	buf := new(bytes.Buffer)
 	defer buf.Reset()
 
-	hostnamectl := exec.Command("hostnamectl")
+	hostnamectl := exec.CommandContext("hostnamectl")
 	hostnamectl.Stdout = buf
 
 	if err := hostnamectl.Run(); err != nil {

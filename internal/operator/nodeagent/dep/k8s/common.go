@@ -67,7 +67,7 @@ gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cl
 		//		errBuf := new(bytes.Buffer)
 		//		defer errBuf.Reset()
 		//
-		//		cmd := exec.Command("yum-config-manager", "--save", "--setopt=kubernetes.skip_if_unavailable=true")
+		//		cmd := exec.CommandContext("yum-config-manager", "--save", "--setopt=kubernetes.skip_if_unavailable=true")
 		//		cmd.Stderr = &errBuf
 		//		if c.monitor.IsVerbose() {
 		//			fmt.Println(strings.Join(cmd.Args, " "))

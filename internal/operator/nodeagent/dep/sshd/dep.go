@@ -2,6 +2,7 @@ package sshd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os/exec"
@@ -19,11 +20,12 @@ type Installer interface {
 }
 
 type sshdDep struct {
+	ctx     context.Context
 	systemd *dep.SystemD
 }
 
-func New(systemd *dep.SystemD) Installer {
-	return &sshdDep{systemd}
+func New(ctx context.Context, systemd *dep.SystemD) Installer {
+	return &sshdDep{ctx, systemd}
 }
 
 func (sshdDep) Is(other nodeagent.Installer) bool {
@@ -45,7 +47,7 @@ func (s *sshdDep) Current() (pkg common.Package, err error) {
 	buf := new(bytes.Buffer)
 	defer buf.Reset()
 
-	swapon := exec.Command("sshd", "-T")
+	swapon := exec.CommandContext(s.ctx, "sshd", "-T")
 	swapon.Stdout = buf
 	if err := swapon.Run(); err != nil {
 		return pkg, err
@@ -71,7 +73,7 @@ func (s *sshdDep) Current() (pkg common.Package, err error) {
 				checkIP = strings.Split(value, ":")[0]
 				pkg.Config["listenaddress"] = checkIP
 			}
-			out, _ := exec.Command("ssh", "-T", checkIP).CombinedOutput()
+			out, _ := exec.CommandContext(s.ctx, "ssh", "-T", checkIP).CombinedOutput()
 			if strings.Contains(string(out), "Connection refused") {
 				if pkg.Config == nil {
 					pkg.Config = make(map[string]string)

@@ -2,6 +2,7 @@ package dep
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,7 +33,7 @@ func (p *PackageManager) rembasedInstall(installVersion *Software, more ...*Soft
 
 		installPkg := fmt.Sprintf("%s-%s", sw.Package, sw.Version)
 		installPkgs = append(installPkgs, installPkg)
-		cmd := exec.Command("yum", "versionlock", "delete", sw.Package)
+		cmd := exec.CommandContext(p.ctx, "yum", "versionlock", "delete", sw.Package)
 		cmd.Stderr = errBuf
 		if p.monitor.IsVerbose() {
 			fmt.Println(strings.Join(cmd.Args, " "))
@@ -45,7 +46,7 @@ func (p *PackageManager) rembasedInstall(installVersion *Software, more ...*Soft
 		}
 		errBuf.Reset()
 
-		cmd = exec.Command("yum", "versionlock", "add", "-y", installPkg)
+		cmd = exec.CommandContext(p.ctx, "yum", "versionlock", "add", "-y", installPkg)
 		cmd.Stderr = errBuf
 		if p.monitor.IsVerbose() {
 			fmt.Println(strings.Join(cmd.Args, " "))
@@ -58,19 +59,19 @@ func (p *PackageManager) rembasedInstall(installVersion *Software, more ...*Soft
 	}
 
 	for _, pkg := range installPkgs {
-		if err := rembasedInstallPkg(p.monitor, pkg); err != nil {
+		if err := rembasedInstallPkg(p.ctx, p.monitor, pkg); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func rembasedInstallPkg(monitor mntr.Monitor, pkg string) error {
+func rembasedInstallPkg(ctx context.Context, monitor mntr.Monitor, pkg string) error {
 	errBuf := new(bytes.Buffer)
 	defer errBuf.Reset()
 	outBuf := new(bytes.Buffer)
 	defer outBuf.Reset()
-	cmd := exec.Command("yum", "install", "-y", pkg)
+	cmd := exec.CommandContext(ctx, "yum", "install", "-y", pkg)
 	cmd.Stderr = errBuf
 	cmd.Stdout = outBuf
 	err := cmd.Run()
@@ -105,7 +106,7 @@ func (p *PackageManager) debbasedInstall(installVersion *Software, more ...*Soft
 		pkgs[idx] = fmt.Sprintf("%s=%s", sw.Package, sw.Version)
 		hold = append(hold, sw.Package)
 
-		cmd := exec.Command("apt-mark", "unhold", sw.Package)
+		cmd := exec.CommandContext(p.ctx, "apt-mark", "unhold", sw.Package)
 		cmd.Stderr = errBuf
 		if p.monitor.IsVerbose() {
 			fmt.Println(strings.Join(cmd.Args, " "))
@@ -117,7 +118,7 @@ func (p *PackageManager) debbasedInstall(installVersion *Software, more ...*Soft
 		errBuf.Reset()
 	}
 
-	cmd := exec.Command("dpkg", "--configure", "-a")
+	cmd := exec.CommandContext(p.ctx, "dpkg", "--configure", "-a")
 	cmd.Stderr = errBuf
 	if p.monitor.IsVerbose() {
 		fmt.Println(strings.Join(cmd.Args, " "))
@@ -128,7 +129,7 @@ func (p *PackageManager) debbasedInstall(installVersion *Software, more ...*Soft
 	}
 	errBuf.Reset()
 
-	cmd = exec.Command("apt-get", append(strings.Fields(
+	cmd = exec.CommandContext(p.ctx, "apt-get", append(strings.Fields(
 		"--assume-yes --allow-downgrades install -y"), pkgs...)...)
 	cmd.Stderr = errBuf
 	if p.monitor.IsVerbose() {
@@ -141,7 +142,7 @@ func (p *PackageManager) debbasedInstall(installVersion *Software, more ...*Soft
 	errBuf.Reset()
 
 	for _, pkg := range hold {
-		cmd = exec.Command("apt-mark", "hold", pkg)
+		cmd = exec.CommandContext(p.ctx, "apt-mark", "hold", pkg)
 		cmd.Stderr = errBuf
 		if p.monitor.IsVerbose() {
 			fmt.Println(strings.Join(cmd.Args, " "))

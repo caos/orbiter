@@ -2,28 +2,30 @@ package centos
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"github.com/caos/orbos/internal/operator/common"
-	"github.com/caos/orbos/internal/operator/nodeagent"
-	"github.com/caos/orbos/mntr"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
 	"text/template"
+
+	"github.com/caos/orbos/internal/operator/common"
+	"github.com/caos/orbos/internal/operator/nodeagent"
+	"github.com/caos/orbos/mntr"
+	"github.com/pkg/errors"
 )
 
 const (
 	prefix string = "orbos"
 )
 
-func Ensurer(monitor mntr.Monitor) nodeagent.NetworkingEnsurer {
+func Ensurer(ctx context.Context, monitor mntr.Monitor) nodeagent.NetworkingEnsurer {
 	return nodeagent.NetworkingEnsurerFunc(func(desired common.Networking) (common.NetworkingCurrent, func() error, error) {
 		current := make(common.NetworkingCurrent, 0)
 		ensurers := make([]func() error, 0)
 
-		ensurer, err := ensureInterfaces(monitor, &desired, &current)
+		ensurer, err := ensureInterfaces(ctx, monitor, &desired, &current)
 		if err != nil {
 			return current, ensurer, err
 		}
@@ -49,6 +51,7 @@ func Ensurer(monitor mntr.Monitor) nodeagent.NetworkingEnsurer {
 }
 
 func ensureInterfaces(
+	ctx context.Context,
 	monitor mntr.Monitor,
 	desired *common.Networking,
 	current *common.NetworkingCurrent,
@@ -63,7 +66,7 @@ func ensureInterfaces(
 		desired.Interfaces = make(map[string]*common.NetworkingInterface, 0)
 	}
 
-	interfaces, err := queryExisting()
+	interfaces, err := queryExisting(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +79,7 @@ addLoop:
 		}
 		//ensure ips for every desired interface
 		ifaceNameWithPrefix := prefix + ifaceName
-		ensureFunc, err := ensureInterface(monitor, ifaceNameWithPrefix, iface)
+		ensureFunc, err := ensureInterface(ctx, monitor, ifaceNameWithPrefix, iface)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +103,7 @@ deleteLoop:
 			continue
 		}
 		ifaceNameWithPrefix := prefix + ifaceName
-		ipsByte, err := queryExistingInterface(ifaceNameWithPrefix)
+		ipsByte, err := queryExistingInterface(ctx, ifaceNameWithPrefix)
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +143,7 @@ deleteLoop:
 	return func() error {
 		monitor.Debug(fmt.Sprintf("Ensuring part of networking"))
 		if changes != nil && len(changes) != 0 {
-			if err := ensureIP(monitor, changes); err != nil {
+			if err := ensureIP(ctx, monitor, changes); err != nil {
 				return err
 			}
 		}
@@ -157,6 +160,7 @@ deleteLoop:
 }
 
 func ensureInterface(
+	ctx context.Context,
 	monitor mntr.Monitor,
 	name string,
 	desired *common.NetworkingInterface,
@@ -167,7 +171,7 @@ func ensureInterface(
 
 	changes := []string{}
 
-	fullInterface, err := queryExistingInterface(name)
+	fullInterface, err := queryExistingInterface(ctx, name)
 	addedVIPs := make([][]byte, 0)
 	if err == nil {
 		addedVIPs = bytes.Split(fullInterface, []byte("\n"))
@@ -215,7 +219,7 @@ deleteLoop:
 	return func() error {
 		monitor.Debug(fmt.Sprintf("Ensuring part of networking with interface %s", name))
 		if changes != nil && len(changes) != 0 {
-			if err := ensureIP(monitor, changes); err != nil {
+			if err := ensureIP(ctx, monitor, changes); err != nil {
 				return err
 			}
 
@@ -229,8 +233,8 @@ deleteLoop:
 	}, nil
 }
 
-func queryExisting() ([]string, error) {
-	cmd := exec.Command("/bin/sh", "-c", `ip link show | awk 'NR % 2 == 1'`)
+func queryExisting(ctx context.Context) ([]string, error) {
+	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", `ip link show | awk 'NR % 2 == 1'`)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -255,14 +259,14 @@ func queryExisting() ([]string, error) {
 	return interfaceNames, nil
 }
 
-func queryExistingInterface(interfaceName string) ([]byte, error) {
+func queryExistingInterface(ctx context.Context, interfaceName string) ([]byte, error) {
 	cmdStr := fmt.Sprintf(`set -o pipefail && ip address show %s | grep %s | tail -n +2 | awk '{print $2}' | cut -d "/" -f 1`, interfaceName, interfaceName)
 
-	cmd := exec.Command("/bin/sh", "-c", cmdStr)
+	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", cmdStr)
 	return cmd.CombinedOutput()
 }
 
-func ensureIP(monitor mntr.Monitor, changes []string) (err error) {
+func ensureIP(ctx context.Context, monitor mntr.Monitor, changes []string) (err error) {
 	defer func() {
 		if err == nil {
 			monitor.Debug("networking changed")
@@ -282,7 +286,7 @@ func ensureIP(monitor mntr.Monitor, changes []string) (err error) {
 	}
 
 	errBuf.Reset()
-	cmd := exec.Command("/bin/bash", "-c", cmdStr)
+	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", cmdStr)
 	cmd.Stderr = errBuf
 
 	if monitor.IsVerbose() {

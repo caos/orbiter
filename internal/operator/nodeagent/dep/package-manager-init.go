@@ -11,7 +11,7 @@ import (
 func (p *PackageManager) debSpecificUpdatePackages() error {
 	errBuf := new(bytes.Buffer)
 	defer errBuf.Reset()
-	cmd := exec.Command("apt-get", "--assume-yes", "update")
+	cmd := exec.CommandContext(p.ctx, "apt-get", "--assume-yes", "update")
 	cmd.Stderr = errBuf
 	if p.monitor.IsVerbose() {
 		fmt.Println(strings.Join(cmd.Args, " "))
@@ -62,7 +62,7 @@ func (p *PackageManager) remSpecificUpdatePackages() error {
 		}
 	}
 
-	cmd := exec.Command("/usr/bin/yum", "--assumeyes", "--errorlevel", "0", "--debuglevel", "3", "update")
+	cmd := exec.CommandContext(p.ctx, "/usr/bin/yum", "--assumeyes", "--errorlevel", "0", "--debuglevel", "3", "update")
 	errBuf := new(bytes.Buffer)
 	defer errBuf.Reset()
 	cmd.Stderr = errBuf
