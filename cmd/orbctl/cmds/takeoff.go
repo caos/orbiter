@@ -33,29 +33,31 @@ func Takeoff(
 	gitOpsNetworking bool,
 ) error {
 
-	if err := gitClient.Configure(orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
-		return err
-	}
-
-	if err := gitClient.Clone(); err != nil {
-		return err
-	}
-
-	withORBITER := gitClient.Exists(git.OrbiterFile)
-	if withORBITER {
-		orbiterConfig := &ctrlgitops.OrbiterConfig{
-			Recur:            recur,
-			Destroy:          destroy,
-			Deploy:           deploy,
-			Verbose:          verbose,
-			Version:          version,
-			OrbConfigPath:    orbConfig.Path,
-			GitCommit:        gitCommit,
-			IngestionAddress: ingestionAddress,
+	withORBITER := false
+	if orbConfig != nil && orbConfig.URL != "" && orbConfig.Repokey != "" {
+		if err := gitClient.Configure(orbConfig.URL, []byte(orbConfig.Repokey)); err != nil {
+			return err
 		}
 
-		if err := ctrlgitops.Orbiter(ctx, monitor, orbiterConfig, gitClient); err != nil {
+		if err := gitClient.Clone(); err != nil {
 			return err
+		}
+
+		withORBITER = gitClient.Exists(git.OrbiterFile)
+		if withORBITER {
+			orbiterConfig := &ctrlgitops.OrbiterConfig{
+				Recur:            recur,
+				Destroy:          destroy,
+				Deploy:           deploy,
+				Verbose:          verbose,
+				Version:          version,
+				OrbConfigPath:    orbConfig.Path,
+				GitCommit:        gitCommit,
+				IngestionAddress: ingestionAddress,
+			}
+			if err := ctrlgitops.Orbiter(ctx, monitor, orbiterConfig, gitClient); err != nil {
+				return err
+			}
 		}
 	}
 
