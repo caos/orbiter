@@ -18,6 +18,6 @@ func GetImageTags() map[string]string {
 		"argoproj/argocd":             "v1.7.4",
 		"quay.io/dexidp/dex":          "v2.22.0",
 		"redis":                       "5.0.8",
-		"ghcr.io/caos/argocd-secrets": "v1.0.20",
+		"ghcr.io/caos/argocd-secrets": "1.0.22",
 	}
 }
