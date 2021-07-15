@@ -11,8 +11,6 @@ jobs:
       - name: Source Checkout Dev
         id: source-checkout-dev
         uses: actions/checkout@v1
-        with:
-          fetch-depth: 1
       - name: Dev-Release
         id: dev-release
         shell: bash
@@ -24,6 +22,7 @@ jobs:
           REGISTRY: ghcr.io
         run: |
           export VERSION=${GITHUB_REF##*/}-dev
+          echo "::set-output name=version::$VERSION"
 
           export IMAGE=$REGISTRY/$GITHUB_REPOSITORY
           export TAG_VERSION=${IMAGE}:${VERSION}

@@ -18,7 +18,8 @@ func EnsureOrbiterArtifacts(
 	client *Client,
 	pprof bool,
 	orbiterversion string,
-	imageRegistry string) error {
+	imageRegistry string,
+) error {
 
 	monitor.WithFields(map[string]interface{}{
 		"orbiter": orbiterversion,
@@ -32,9 +33,13 @@ func EnsureOrbiterArtifacts(
 	k8sNameLabels := labels.MustK8sMap(nameLabels)
 	k8sPodSelector := labels.MustK8sMap(labels.DeriveNameSelector(nameLabels, false))
 
-	cmd := []string{"/orbctl", "--gitops", "--orbconfig", "/etc/orbiter/orbconfig", "takeoff", "orbiter", "--recur", "--ingestion="}
+	cmd := []string{"/orbctl", "--gitops", "--orbconfig", "/etc/orbiter/orbconfig", "takeoff", "orbiter", "--recur"}
 	if pprof {
 		cmd = append(cmd, "--pprof")
+	}
+
+	if _, _, ingestionEnabled := mntr.Environment(); !ingestionEnabled {
+		cmd = append(cmd, "--disable-ingestion")
 	}
 
 	deployment := &apps.Deployment{

@@ -238,6 +238,10 @@ status:
 		}}
 	}
 
+	if _, _, ingestionEnabled := mntr.Environment(); !ingestionEnabled {
+		cmd = append(cmd, "--disable-ingestion")
+	}
+
 	deployment := &apps.Deployment{
 		ObjectMeta: mach.ObjectMeta{
 			Name:      nameLabels.Name(),

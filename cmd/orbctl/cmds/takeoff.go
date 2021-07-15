@@ -22,10 +22,8 @@ func Takeoff(
 	orbConfig *orbcfg.Orb,
 	gitClient *git.Client,
 	recur bool,
-	destroy bool,
 	deploy bool,
 	verbose bool,
-	ingestionAddress string,
 	version string,
 	gitCommit string,
 	kubeconfig string,
@@ -44,14 +42,12 @@ func Takeoff(
 	withORBITER := gitClient.Exists(git.OrbiterFile)
 	if withORBITER {
 		orbiterConfig := &ctrlgitops.OrbiterConfig{
-			Recur:            recur,
-			Destroy:          destroy,
-			Deploy:           deploy,
-			Verbose:          verbose,
-			Version:          version,
-			OrbConfigPath:    orbConfig.Path,
-			GitCommit:        gitCommit,
-			IngestionAddress: ingestionAddress,
+			Recur:         recur,
+			Deploy:        deploy,
+			Verbose:       verbose,
+			Version:       version,
+			OrbConfigPath: orbConfig.Path,
+			GitCommit:     gitCommit,
 		}
 
 		if err := ctrlgitops.Orbiter(ctx, monitor, orbiterConfig, gitClient); err != nil {

@@ -66,6 +66,11 @@ func AdaptFunc(
 
 		whitelistChan := make(chan []*orbiter.CIDR)
 
+		orbID, err := orbConfig.ID()
+		if err != nil {
+			panic(err)
+		}
+
 		for provID, providerTree := range desiredKind.Providers {
 
 			providerCurrent := &tree.Tree{}
@@ -84,6 +89,7 @@ func AdaptFunc(
 				whitelistChan,
 				finishedChan,
 				orbiterCommit,
+				orbID,
 				orbConfig.URL,
 				orbConfig.Repokey,
 				oneoff,

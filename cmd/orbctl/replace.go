@@ -13,9 +13,15 @@ func ReplaceCommand(getRv GetRootValues) *cobra.Command {
 		Use:   "replace",
 		Short: "Replace a node with a new machine available in the same pool",
 		Long:  "Pass machine ids as arguments, omit arguments for selecting machines interactively",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-			rv, err := getRv()
+			node := ""
+			if len(args) > 0 {
+				node = args[0]
+			}
+
+			rv, err := getRv("replace", "", map[string]interface{}{"node": node})
 			if err != nil {
 				return err
 			}

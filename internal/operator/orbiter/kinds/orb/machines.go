@@ -10,10 +10,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-type MachinesFunc func(monitor mntr.Monitor, desiredTree *tree.Tree, repoURL string) (machineIDs []string, machines map[string]infra.Machine, err error)
+type MachinesFunc func(monitor mntr.Monitor, desiredTree *tree.Tree, orbID string) (machineIDs []string, machines map[string]infra.Machine, err error)
 
 func ListMachines(operarorLabels *labels.Operator) MachinesFunc {
-	return func(monitor mntr.Monitor, desiredTree *tree.Tree, repoURL string) (machineIDs []string, machines map[string]infra.Machine, err error) {
+	return func(monitor mntr.Monitor, desiredTree *tree.Tree, orbID string) (machineIDs []string, machines map[string]infra.Machine, err error) {
 		defer func() {
 			err = errors.Wrapf(err, "building %s failed", desiredTree.Common.Kind)
 		}()
@@ -54,7 +54,7 @@ func ListMachines(operarorLabels *labels.Operator) MachinesFunc {
 				monitor.WithFields(map[string]interface{}{"provider": provID}),
 				providerTree,
 				provID,
-				repoURL,
+				orbID,
 			)
 			if err != nil {
 				return nil, nil, err

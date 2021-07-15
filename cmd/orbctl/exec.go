@@ -28,7 +28,12 @@ func ExecCommand(getRv GetRootValues) *cobra.Command {
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
 
-		rv, err := getRv()
+		machineID := ""
+		if len(args) > 0 {
+			machineID = args[0]
+		}
+
+		rv, err := getRv("exec", "", map[string]interface{}{"machine": machineID, "command": command != ""})
 		if err != nil {
 			return err
 		}
@@ -46,10 +51,7 @@ func ExecCommand(getRv GetRootValues) *cobra.Command {
 
 		return machines(monitor, gitClient, orbConfig, func(machineIDs []string, machines map[string]infra.Machine, _ *tree.Tree) error {
 
-			machineID := ""
-			if len(args) > 0 {
-				machineID = args[0]
-			} else {
+			if machineID == "" {
 				if err := survey.AskOne(&survey.Select{
 					Message: "Select a machine:",
 					Options: machineIDs,

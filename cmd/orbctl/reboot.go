@@ -13,9 +13,15 @@ func RebootCommand(getRv GetRootValues) *cobra.Command {
 		Use:   "reboot",
 		Short: "Gracefully reboot machines",
 		Long:  "Pass machine ids as arguments, omit arguments for selecting machines interactively",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-			rv, err := getRv()
+			node := ""
+			if len(args) > 0 {
+				node = args[0]
+			}
+
+			rv, err := getRv("reboot", "", map[string]interface{}{"node": node})
 			if err != nil {
 				return err
 			}

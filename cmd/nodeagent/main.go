@@ -24,24 +24,27 @@ import (
 	"github.com/caos/orbos/internal/operator/nodeagent/firewall"
 )
 
-var gitCommit string
-var version string
+var (
+	gitCommit string
+	version   string
+)
 
 func main() {
 
-	defer func() {
-		r := recover()
-		if r != nil {
-			os.Stderr.Write([]byte(fmt.Sprintf("\x1b[0;31m%v\x1b[0m\n", r)))
-			os.Exit(1)
-		}
-	}()
+	monitor := mntr.Monitor{
+		OnInfo:   mntr.LogMessage,
+		OnChange: mntr.LogMessage,
+		OnError:  mntr.LogError,
+	}
+
+	defer monitor.RecoverPanic()
 
 	verbose := flag.Bool("verbose", false, "Print logs for debugging")
 	printVersion := flag.Bool("version", false, "Print build information")
 	ignorePorts := flag.String("ignore-ports", "", "Comma separated list of firewall ports that are ignored")
 	nodeAgentID := flag.String("id", "", "The managed machines ID")
 	pprof := flag.Bool("pprof", false, "start pprof as port 6060")
+	sentryEnvironment := flag.String("environment", "", "Sentry environment")
 
 	flag.Parse()
 
@@ -50,24 +53,28 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *nodeAgentID == "" {
-		panic("flag --id is required")
+	if *sentryEnvironment != "" {
+		if err := mntr.Ingest(monitor, "orbos", version, *sentryEnvironment, "node-agent"); err != nil {
+			panic(err)
+		}
 	}
-	monitor := mntr.Monitor{
-		OnInfo:   mntr.LogMessage,
-		OnChange: mntr.LogMessage,
-		OnError:  mntr.LogError,
-	}
+
+	monitor.WithField("id", nodeAgentID).CaptureMessage("nodeagent invoked")
 
 	if *verbose {
 		monitor = monitor.Verbose()
 	}
 
+	if *nodeAgentID == "" {
+		panic("flag --id is required")
+	}
+
 	monitor.WithFields(map[string]interface{}{
-		"version":     version,
-		"commit":      gitCommit,
-		"verbose":     *verbose,
-		"nodeAgentID": *nodeAgentID,
+		"version":           version,
+		"commit":            gitCommit,
+		"verbose":           *verbose,
+		"nodeAgentID":       *nodeAgentID,
+		"sentryEnvironment": *sentryEnvironment,
 	}).Info("Node Agent is starting")
 
 	if *pprof {

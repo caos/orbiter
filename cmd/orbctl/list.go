@@ -22,7 +22,7 @@ func ListCommand(getRv GetRootValues) *cobra.Command {
 			Use:   "list",
 			Short: "List available machines",
 			Long:  "List available machines",
-			Args:  cobra.MaximumNArgs(1),
+			Args:  cobra.MaximumNArgs(0),
 		}
 	)
 
@@ -31,7 +31,8 @@ func ListCommand(getRv GetRootValues) *cobra.Command {
 	flags.StringVar(&context, "context", "", "Print machines from this context only")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
-		rv, err := getRv()
+
+		rv, err := getRv("list", "", map[string]interface{}{"column": column, "context": context})
 		if err != nil {
 			return err
 		}

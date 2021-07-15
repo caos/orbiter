@@ -11,8 +11,6 @@ jobs:
       - name: Source Checkout
         id: source-checkout
         uses: actions/checkout@v1
-        with:
-          fetch-depth: 1
       - name: Release
         id: release
         shell: bash
@@ -28,6 +26,7 @@ jobs:
           export VERSION=$BRANCH
           VERSION="v$(npx semantic-release --dry-run --plugins=@semantic-release/commit-analyzer --analize-commits | grep "The next release version is" | sed -ne 's/.*The\ next\ release\ version\ is\ \([0-9]\+\.[0-9]\+\.[0-9]\+\)$/\1/p')"
           [[ "$VERSION" == "v" ]] && echo "Exiting, as no new version needs to be released" && exit 0
+          echo "::set-output name=version::$VERSION"
 
           export IMAGE=$REGISTRY/$GITHUB_REPOSITORY
           export TAG_LATEST=${IMAGE}:latest
@@ -47,3 +46,13 @@ jobs:
           docker push ${TAG_LATEST}
 
           npx semantic-release && exit 0
+      - name: Create Sentry release
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: caos
+          SENTRY_PROJECT: orbctl
+        with:
+          version: orbos-${{ steps.release.outputs.version }}
+          projects: "orbctl boom orbiter networking-operator node-agent"
+        if: steps.release.outputs.version != null

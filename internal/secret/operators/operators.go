@@ -41,7 +41,7 @@ func GetAllSecretsFunc(
 		map[string]*tree.Tree,
 		error,
 	) {
-		return getAllSecrets(monitor, printLogs, gitops, gitClient, k8sClient, orb)
+		return getAllSecrets(monitor, printLogs, gitops, gitClient, k8sClient, orb, true)
 	}
 }
 
@@ -52,6 +52,7 @@ func getAllSecrets(
 	gitClient *git.Client,
 	k8sClient kubernetes.ClientInt,
 	orb *orbcfg.Orb,
+	disableIngestion bool,
 ) (
 	map[string]*secret.Secret,
 	map[string]*secret.Existing,

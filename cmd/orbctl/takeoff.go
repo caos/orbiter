@@ -12,7 +12,6 @@ import (
 	"github.com/caos/orbos/cmd/orbctl/cmds"
 	"github.com/caos/orbos/internal/ctrlcrd"
 	"github.com/caos/orbos/internal/ctrlgitops"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
@@ -21,9 +20,7 @@ func TakeoffCommand(getRv GetRootValues) *cobra.Command {
 	var (
 		verbose          bool
 		recur            bool
-		destroy          bool
 		deploy           bool
-		ingestionAddress string
 		gitOpsBoom       bool
 		gitOpsNetworking bool
 		cmd              = &cobra.Command{
@@ -38,14 +35,10 @@ func TakeoffCommand(getRv GetRootValues) *cobra.Command {
 	flags.BoolVar(&deploy, "deploy", true, "Ensure Orbiter and Boom deployments continously")
 	flags.BoolVar(&gitOpsBoom, "gitops-boom", false, "Ensure Boom runs in gitops mode")
 	flags.BoolVar(&gitOpsNetworking, "gitops-networking", false, "Ensure Networking-operator runs in gitops mode")
-	flags.StringVar(&ingestionAddress, "ingestion", "", "Ingestion API address")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
-		if recur && destroy {
-			return errors.New("flags --recur and --destroy are mutually exclusive, please provide either one or none")
-		}
 
-		rv, err := getRv()
+		rv, err := getRv("takeoff", "", map[string]interface{}{"recur": recur, "deploy": deploy, "gitops-boom": gitOpsBoom, "gitops-networking": gitOpsNetworking})
 		if err != nil {
 			return err
 		}
@@ -63,10 +56,8 @@ func TakeoffCommand(getRv GetRootValues) *cobra.Command {
 			orbConfig,
 			gitClient,
 			recur,
-			destroy,
 			deploy,
 			verbose,
-			ingestionAddress,
 			version,
 			gitCommit,
 			rv.Kubeconfig,
@@ -79,13 +70,11 @@ func TakeoffCommand(getRv GetRootValues) *cobra.Command {
 
 func StartOrbiter(getRv GetRootValues) *cobra.Command {
 	var (
-		verbose          bool
-		recur            bool
-		destroy          bool
-		deploy           bool
-		ingestionAddress string
-		pprof            bool
-		cmd              = &cobra.Command{
+		verbose bool
+		recur   bool
+		deploy  bool
+		pprof   bool
+		cmd     = &cobra.Command{
 			Use:   "orbiter",
 			Short: "Launch an orbiter",
 			Long:  "Ensures a desired state",
@@ -96,14 +85,10 @@ func StartOrbiter(getRv GetRootValues) *cobra.Command {
 	flags.BoolVar(&recur, "recur", true, "Ensure the desired state continously")
 	flags.BoolVar(&deploy, "deploy", true, "Ensure Orbiter deployment continously")
 	flags.BoolVar(&pprof, "pprof", false, "Start pprof to analyse memory usage")
-	flags.StringVar(&ingestionAddress, "ingestion", "", "Ingestion API address")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
-		if recur && destroy {
-			return errors.New("flags --recur and --destroy are mutually exclusive, please provide eighter one or none")
-		}
 
-		rv, err := getRv()
+		rv, err := getRv("orbiter", "orbiter", map[string]interface{}{"recur": recur, "depoy": deploy, "pprof": pprof})
 		if err != nil {
 			return err
 		}
@@ -125,14 +110,12 @@ func StartOrbiter(getRv GetRootValues) *cobra.Command {
 		}
 
 		orbiterConfig := &ctrlgitops.OrbiterConfig{
-			Recur:            recur,
-			Destroy:          destroy,
-			Deploy:           deploy,
-			Verbose:          verbose,
-			Version:          version,
-			OrbConfigPath:    orbConfig.Path,
-			GitCommit:        gitCommit,
-			IngestionAddress: ingestionAddress,
+			Recur:         recur,
+			Deploy:        deploy,
+			Verbose:       verbose,
+			Version:       version,
+			OrbConfigPath: orbConfig.Path,
+			GitCommit:     gitCommit,
 		}
 
 		if pprof {
@@ -161,7 +144,7 @@ func StartBoom(getRv GetRootValues) *cobra.Command {
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
 
-		rv, err := getRv()
+		rv, err := getRv("boom", "boom", map[string]interface{}{"metrics-addr": metricsAddr != ""})
 		if err != nil {
 			return err
 		}
@@ -196,7 +179,7 @@ func StartNetworking(getRv GetRootValues) *cobra.Command {
 	flags.StringVar(&metricsAddr, "metrics-addr", "", "The address the metric endpoint binds to.")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		rv, err := getRv()
+		rv, err := getRv("networking-operator", "networking-operator", map[string]interface{}{"metrics-addr": metricsAddr != ""})
 		if err != nil {
 			return err
 		}

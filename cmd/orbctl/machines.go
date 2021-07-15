@@ -41,10 +41,15 @@ func machines(monitor mntr.Monitor, gitClient *git.Client, orbConfig *orbcfg.Orb
 
 	listMachines := orb.ListMachines(labels.NoopOperator("ORBOS"))
 
+	orbID, err := orbConfig.ID()
+	if err != nil {
+		return err
+	}
+
 	machineIDs, machines, err := listMachines(
 		monitor,
 		desired,
-		orbConfig.URL,
+		orbID,
 	)
 
 	return do(machineIDs, machines, desired)

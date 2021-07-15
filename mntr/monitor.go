@@ -5,6 +5,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/getsentry/sentry-go"
 )
 
 type OnMessage func(string, map[string]string)
@@ -62,7 +64,16 @@ func (m Monitor) Changed(evt string) {
 }
 
 func (m Monitor) Error(err error) {
-	if err == nil || m.OnError == nil {
+
+	if err == nil {
+		return
+	}
+
+	m.captureWithFields(func(client *sentry.Client, scope sentry.EventModifier) {
+		client.CaptureException(err, nil, scope)
+	})
+
+	if m.OnError == nil {
 		return
 	}
 
@@ -75,12 +86,18 @@ func (m Monitor) Error(err error) {
 	m.OnError(err, normalize(m.Fields))
 }
 
+func (m Monitor) CaptureMessage(msg string) {
+	m.captureWithFields(func(client *sentry.Client, scope sentry.EventModifier) {
+		client.CaptureMessage(msg, nil, scope)
+	})
+}
+
 func (m Monitor) RecoverPanic() {
 	if m.OnRecoverPanic == nil {
 		return
 	}
-
-	if r := recover(); r != nil {
+	r := recover()
+	if r != nil {
 		m.Fields = merge(map[string]interface{}{
 			"ts":    now(),
 			"panic": r,
@@ -89,6 +106,16 @@ func (m Monitor) RecoverPanic() {
 
 		m.addDebugContext()
 		m.OnRecoverPanic(r, normalize(m.Fields))
+	}
+
+	if sentryClient != nil {
+		if r != nil {
+			sentryClient.Recover(r, nil, nil)
+		}
+		// Also send errors if it wasn't a panic
+		sentryClient.Flush(time.Second * 2)
+	}
+	if r != nil {
 		panic(r)
 	}
 }

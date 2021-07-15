@@ -24,7 +24,12 @@ orbctl readsecret orbiter.k8s.kubeconfig.encrypted
 orbctl readsecret orbiter.k8s.kubeconfig.encrypted > ~/.kube/config`,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-			rv, err := getRv()
+			path := ""
+			if len(args) > 0 {
+				path = args[0]
+			}
+
+			rv, err := getRv("readsecret", "", map[string]interface{}{"path": path})
 			if err != nil {
 				return err
 			}
@@ -35,11 +40,6 @@ orbctl readsecret orbiter.k8s.kubeconfig.encrypted > ~/.kube/config`,
 			monitor := rv.Monitor
 			orbConfig := rv.OrbConfig
 			gitClient := rv.GitClient
-
-			path := ""
-			if len(args) > 0 {
-				path = args[0]
-			}
 
 			k8sClient, err := cli.Client(monitor, orbConfig, gitClient, rv.Kubeconfig, rv.Gitops, true)
 			if err != nil && !rv.Gitops {

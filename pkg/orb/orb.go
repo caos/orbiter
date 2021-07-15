@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/caos/orbos/internal/ssh"
 	"github.com/caos/orbos/internal/stores/github"
@@ -20,7 +22,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var alphanum = regexp.MustCompile("[^a-zA-Z0-9]+")
+
 type Orb struct {
+	id        string `yaml:"-"`
 	Path      string `yaml:"-"`
 	URL       string
 	Repokey   string
@@ -93,7 +98,7 @@ func (o *Orb) writeBackOrbConfig() error {
 	return ioutil.WriteFile(o.Path, data, os.ModePerm)
 }
 
-func Reconfigure(ctx context.Context, monitor mntr.Monitor, orbConfig *Orb, newRepoURL, newMasterKey string, gitClient *git.Client, clientID, clientSecret string) error {
+func Reconfigure(ctx context.Context, monitor mntr.Monitor, orbConfig *Orb, newRepoURL, newMasterKey string, gitClient *git.Client, clientID, clientSecret string) (err error) {
 	if orbConfig.URL == "" && newRepoURL == "" {
 		return errors.New("repository url is neighter passed by flag repourl nor written in orbconfig")
 	}
@@ -118,6 +123,11 @@ func Reconfigure(ctx context.Context, monitor mntr.Monitor, orbConfig *Orb, newR
 	}
 	if newRepoURL != "" {
 		monitor.Info("Changing repository url in current orbconfig")
+		defer func() {
+			if err == nil {
+				monitor.WithField("url", newRepoURL).CaptureMessage("New Repository URL configured")
+			}
+		}()
 		orbConfig.URL = newRepoURL
 		changes = true
 	}
@@ -177,4 +187,18 @@ func Reconfigure(ctx context.Context, monitor mntr.Monitor, orbConfig *Orb, newR
 	}
 
 	return nil
+}
+
+func (o *Orb) ID() (string, error) {
+
+	if err := IsComplete(o); err != nil {
+		return "", err
+	}
+
+	if o.id != "" {
+		return o.id, nil
+	}
+
+	o.id = alphanum.ReplaceAllString(strings.TrimSuffix(strings.TrimPrefix(o.URL, "git@"), ".git"), "-")
+	return o.id, nil
 }

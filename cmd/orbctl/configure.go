@@ -33,7 +33,7 @@ func ConfigCommand(getRv GetRootValues) *cobra.Command {
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
 
-		rv, _ := getRv()
+		rv, _ := getRv("configure", "", map[string]interface{}{"masterkey": newMasterKey != "", "newRepoURL": newRepoURL})
 		defer func() {
 			err = rv.ErrFunc(err)
 		}()

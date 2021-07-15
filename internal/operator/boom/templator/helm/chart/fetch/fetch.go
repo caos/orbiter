@@ -22,7 +22,7 @@ type ChartInfo struct {
 func All(monitor mntr.Monitor, basePath string, newVersions bool) error {
 	allApps := bundles.GetAll()
 
-	monitor.Info("Init Helm")
+	monitor.Info("Ingest Helm")
 
 	// helm init to create a HELMHOME
 	if err := helmcommand.Init(basePath); err != nil {

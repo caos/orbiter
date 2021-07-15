@@ -25,7 +25,7 @@ func EditCommand(getRv GetRootValues) *cobra.Command {
 		Example: `orbctl edit desired.yml`,
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-			rv, err := getRv()
+			rv, err := getRv("edit", "", map[string]interface{}{"file": args[0]})
 			if err != nil {
 				return err
 			}

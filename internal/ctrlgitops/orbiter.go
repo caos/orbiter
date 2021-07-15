@@ -10,14 +10,10 @@ import (
 	"github.com/caos/orbos/pkg/labels"
 
 	"github.com/caos/orbos/internal/executables"
-	"github.com/caos/orbos/internal/ingestion"
 	"github.com/caos/orbos/internal/operator/orbiter"
 	"github.com/caos/orbos/internal/operator/orbiter/kinds/orb"
 	"github.com/caos/orbos/mntr"
 	"github.com/caos/orbos/pkg/git"
-	"github.com/golang/protobuf/ptypes"
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type OrbiterConfig struct {
@@ -101,52 +97,13 @@ func iterate(conf *OrbiterConfig, gitClient *git.Client, firstIteration bool, ct
 		return
 	}
 
-	pushEvents := func(events []*ingestion.EventRequest) error { return nil }
-	if conf.IngestionAddress != "" {
-		conn, err := grpc.Dial(conf.IngestionAddress, grpc.WithInsecure())
-		if err != nil {
-			panic(err)
-		}
-
-		ingc := ingestion.NewIngestionServiceClient(conn)
-		defer conn.Close()
-
-		pushEvents = func(events []*ingestion.EventRequest) error {
-			_, err := ingc.PushEvents(ctx, &ingestion.EventsRequest{
-				Orb:    orbFile.URL,
-				Events: events,
-			})
-			return err
-		}
-	}
-
 	if firstIteration {
-
-		if err := pushEvents([]*ingestion.EventRequest{{
-			CreationDate: ptypes.TimestampNow(),
-			Type:         "orbiter.tookoff",
-			Data: &structpb.Struct{
-				Fields: map[string]*structpb.Value{
-					"commit": {Kind: &structpb.Value_StringValue{StringValue: conf.GitCommit}},
-				},
-			},
-		}}); err != nil {
-			panic(err)
-		}
 
 		started := float64(time.Now().UTC().Unix())
 
 		go func() {
-			for range time.Tick(time.Minute) {
-				pushEvents([]*ingestion.EventRequest{{
-					CreationDate: ptypes.TimestampNow(),
-					Type:         "orbiter.running",
-					Data: &structpb.Struct{
-						Fields: map[string]*structpb.Value{
-							"since": {Kind: &structpb.Value_NumberValue{NumberValue: started}},
-						},
-					},
-				}})
+			for range time.Tick(30 * time.Minute) {
+				monitor.WithField("since", started).CaptureMessage("ORBITER is running")
 			}
 		}()
 
@@ -175,7 +132,6 @@ func iterate(conf *OrbiterConfig, gitClient *git.Client, firstIteration bool, ct
 		GitClient:     gitClient,
 		Adapt:         adaptFunc,
 		FinishedChan:  finishedChan,
-		PushEvents:    pushEvents,
 		OrbConfig:     *orbFile,
 	}
 
